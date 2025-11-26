@@ -67,6 +67,12 @@ print(df)
 
 '''
 import pandas as pd
+import itertools
+import gurobipy as gp
+
+
+def calculate_distance(longitude,latitude):
+    
 AC = pd.read_excel('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\AircraftData.xlsx', index_col=0)
 
 print(AC)
@@ -74,8 +80,8 @@ print(AC)
 
 
 
-I = ["Origin", "Origin"]           # To be filled in
-J = ["Destination", "Destination"] # To be filled in
+I = ["Origin", "Origin"]                # To be filled in
+J = ["Destination", "Destination"]      # To be filled in
 rows = []
 for i, j in itertools.product(I, J, K):
     distance = ...
@@ -92,6 +98,5 @@ for i, j in itertools.product(I, J, K):
 
 OD = OD.DataFrame(rows).set_index(["i", "j"]).sort_index()
 print(OD)
-
 
 
