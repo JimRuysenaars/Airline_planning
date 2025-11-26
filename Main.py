@@ -107,7 +107,6 @@ def build_distance_matrix(path):
 
 # Build distance matrix
 D_matrix = build_distance_matrix('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\airport_data.xlsx')
-print(D_matrix)
     
 AC = pd.read_excel('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\AircraftData.xlsx', index_col=0)
 
