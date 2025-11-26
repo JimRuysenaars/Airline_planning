@@ -5,7 +5,11 @@ OD matrix includes: dataframe i x j: showing:
     d_ij    : distance between airports i and j
     Yield_ij: (function of d_ij) revenue per Revenue Passenger Kilometers (RPK) flown (average yield)
 
-Airport dataframe: TODO
+Airport dataframe:
+    Variable G: 0 if a hub is located at airport k; 1 otherwise:
+        -> new column with G, only 0 for hub airport Madrid
+    runway length
+    available slots 
 
 Sets:
 N: set of airports
@@ -121,23 +125,61 @@ def create_OD(path_distance, path_demand):
 
     OD = pd.DataFrame(rows).set_index(["i", "j"]).sort_index()
     return OD
-   
+
+def create_AP(path):
+    df = pd.read_excel(path, header=None)
+    icao = df.iloc[1, 1:].tolist()
+    runway_length_raw = df.iloc[4, 1:]
+    runway_length = pd.to_numeric(runway_length_raw, errors='coerce').fillna(0).to_numpy()
+    available_slots_raw = df.iloc[5, 1:]
+    available_slots = pd.to_numeric(available_slots_raw, errors='coerce').fillna(0).to_numpy()
+
+    
+    AP = pd.DataFrame(index=icao, columns=['runway_length', 'available_slots'], dtype=float)
+    for i in range(len(icao)):
+        AP.loc[icao[i], 'runway_length'] = runway_length[i]
+        if icao[i] == 'LEMF':  # Madrid airport as hub
+            AP.loc[icao[i], 'G'] = 0
+            AP.loc[icao[i], 'available_slots'] = 9999  # Infinite slots for hub
+        else:
+            AP.loc[icao[i], 'G'] = 1
+            AP.loc[icao[i], 'available_slots'] = available_slots[i]   
+    return AP
+
+def build_a_ijk(OD, AC):
+    I = OD.index.get_level_values(0).unique().to_list()                         
+    J = OD.index.get_level_values(1).unique().to_list()                         
+    K = AC.index                                                                
+    a_ijk = {}
+    for i in I:
+        for j in J:
+            for k in K:
+                if OD.loc[(i, j), "distance"] <= AC.loc[k, "max_range"]:
+                    a_ijk[(i, j, k)] = 10000
+                else:
+                    a_ijk[(i, j, k)] = 0
+    return a_ijk
 
 # Build dataframes
 AC = pd.read_excel('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\AircraftData.xlsx', index_col=0)
-OD = create_OD('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\airport_data.xlsx', 'C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\demand_per_week.xlsx')
 print(AC)
-print(OD.head())
-
+OD = create_OD('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\airport_data.xlsx', 'C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\demand_per_week.xlsx')
+AP = create_AP('C:\\Users\\jimru\\OneDrive\\Documenten\\python\\Airline_planning\\Problem 1 - Data\\airport_data.xlsx')
+a_ijk = build_a_ijk(OD, AC)
 
 # Initialize gubropyi model
 model = gp.Model("Airline_Planning")
+
+# Parameters
+fuel_cost = ...
+utilization_time = 10 * 7
+LF = ...
+
 
 # Create decision variables
 I = OD.index.get_level_values(0).unique().to_list()                         # set of airports i       
 J = OD.index.get_level_values(1).unique().to_list()                         # set of airports j
 K = AC.index                                                                # set of aircraft types k 
-
 
 
 x = model.addVars(I, J, name="xij", vtype=gp.GRB.CONTINUOUS, lb=0)          # Direct flow from airport i to airport j
@@ -168,8 +210,64 @@ gp.addConstrs( ( x[(i, j)] + w[(i, j)] <= gp.quicksum( OD.loc[(i, j), "demand"])
                 for i in I  
                 for j in J ), name="C1_Capacity")
 
-# C2: w lower than demand
+# C1*: w lower than demand
 gp.addConstrs( (w[i, j] <= OD.loc[(i, j), "demand"] * g[i] * g[j]
                 for i in I
-                for j in J ), name="C2_Transfer_via_hub")
+                for j in J ), name="C1*_Transfer_via_hub")
+
+# C2: Capacity per flight
+gp.addConstrs(  (x[(i, j)]                
+                for i in I
+                for j in J) + 
+                gp.quicksum( (w[i, m] * (1 - AP.loc[j, "G"]) +
+                              w[m, j] * (1 - AP.loc[i, "G"]) ) 
+                              for i in I
+                              for j in J
+                              for m in I if m != i and m != j )
+                <= gp.quicksum( 
+                    z[(i, j), k] * AC.loc[k, "seats"] * LF 
+                    
+                for k in K  
+                for i in I 
+                for j in J)
+ , name="C2_Flight_Capacity")
+
+# C3: Every flight goes back and forth
+gp.addConstrs( ( gp.quicksum( z[(i, j), k] for k in K ) == 
+                 gp.quicksum( z[(j, i), k] for k in K ) 
+                 for i in I 
+                 for j in J ), name="C3_Round_Trip")
+
+
+
+# C4: Fleet availability: Operating time is smaller than available time
+gp.addConstrs(  gp.quicksum( (OD.loc[(i, j), "distance"] / AC.loc[k, "speed"] + (AC.loc[k, "avg_TAT"] * ( 1 + 0.5  * ( 1 - AP.loc[j, "G"]) ) ) * z[(i, j), k])
+                             <= utilization_time * y[k]
+                for k in K
+                for i in I 
+                for j in J), name = "C4_Fleet_availability")
+                
+                
+# C5: Range constraint
+gp.addConstrs(  (z[(i, j), k] <= a_ijk[(i, j, k)] * y[k]
+                for i in I
+                for j in J
+                for k in K), name = "C5_Range_constraint")
+
+
+# C6: All flights start or end at hub
+gp.addConstrs( (z[(i, j), k] * (AP.loc[i, "G"] + AP.loc[j, "G"]) <= 1
+             for i in I
+             for j in J
+             for k in K), name = "C6_Hub_constraint")
+
+# C7 : Runway length constraint 
+gp.addConstrs(( z[(i,j),k] * AC.loc[k, "runway_required"] <= AP.loc[j, "runway_length"]
+                for i in I
+                for j in J
+                for k in K), name = "C7_Runway_length_constraint")
+
+
+# C8: Available slots constraint
+gp.addConstr()
 
