@@ -220,7 +220,7 @@ def compare_demand_matrices(observed_demand, predicted_demand):
 
     return None
 
-def main():
+def __main__():
     """
     Main execution of all functions. Returns the future demand matrix for 2026.
     """
