@@ -228,4 +228,8 @@ def __main__():
     future_demand_matrix = future_demand_forecast(k, beta_1, beta_2, beta_3, forecasted_population_GDP, distances)
     compare_demand_matrices(demand_data, predicted_demand_dataframe)
 
+    future_demand_matrix.to_excel("future_demand_matrix_2026.xlsx")
+
     return future_demand_matrix
+
+__main__()
