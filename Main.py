@@ -186,9 +186,9 @@ def build_a_ijk(OD, AC):
     return a_ijk
 
 # Build dataframes
-AC = create_AC('C:\\Users\\LEMVo\\OneDrive\\Documenten\\LR\\Courses\\Airline_planning\\Airline_planning\\Problem 1 - Data\\AircraftData.xlsx')
-OD = create_OD('C:\\Users\\LEMVo\\OneDrive\\Documenten\\LR\\Courses\\Airline_planning\\Airline_planning\\Problem 1 - Data\\airport_data.xlsx', 'C:\\Users\\LEMVo\\OneDrive\\Documenten\\LR\\Courses\\Airline_planning\\Airline_planning\\Problem 1 - Data\\demand_per_week.xlsx')
-AP = create_AP('C:\\Users\\LEMVo\\OneDrive\\Documenten\\LR\\Courses\\Airline_planning\\Airline_planning\\Problem 1 - Data\\airport_data.xlsx')
+AC = create_AC('Problem 1 - Data\\AircraftData.xlsx')
+OD = create_OD('Problem 1 - Data\\airport_data.xlsx', 'Problem 1 - Data\\demand_per_week.xlsx')
+AP = create_AP('Problem 1 - Data\\airport_data.xlsx')
 a_ijk = build_a_ijk(OD, AC)
 print(AC)
 
@@ -197,54 +197,27 @@ model = gp.Model("Airline_Planning")
 
 # Parameters
 fuel_cost = 1.42  # €/gallon
-utilization_time = 10 * 7   # 10 hours of operstions per day, 7 days a week
+utilization_time = 10 * 7   # 10 hours of operstions per day, 7 days a week -> 70 hours per week
 LF = 0.75  # Load factor
 
 
 # Create decision variables
-pairs = OD.index.tolist()       #Try pair (i,j) instead of i j separately
-# I = OD.index.get_level_values(0).unique().to_list()                         # set of airports i       
-# J = OD.index.get_level_values(1).unique().to_list()                         # set of airports j
+pairs = OD.index.tolist()       # List of (i,j) pairs
 K = AC.index                                                                # set of aircraft types k 
 
-# OLD decision variables for full matrices
-# x = model.addVars(I, J, name="xij", vtype=gp.GRB.CONTINUOUS, lb=0)          # Direct flow from airport i to airport j
-# y = model.addVars(K, name="y", vtype=gp.GRB.CONTINUOUS, lb=0)               # number of aircraft of type k
-# z = model.addVars(I, J, K, name="zijk", vtype=gp.GRB.INTEGER, lb=0)         # number of flights from airport i to airport j with aircraft type k
-# w = model.addVars(I, J, name="wij", vtype=gp.GRB.CONTINUOUS, lb=0)          # flow from airport i to airport j that transfers at the hub
-
-# Decision variables for pairs
-x = model.addVars(pairs, name="xij", vtype=gp.GRB.CONTINUOUS, lb=0)          # Direct flow from airport i to airport j
-w = model.addVars(pairs, name="wij", vtype=gp.GRB.CONTINUOUS, lb=0)          # flow from airport i to airport j that transfers at the hub
-y = model.addVars(K, name="y", vtype=gp.GRB.CONTINUOUS, lb=0)               # number of aircraft of type k
+# Decision variables
+x = model.addVars(pairs, name="xij", vtype=gp.GRB.INTEGER, lb=0)          # Direct flow from airport i to airport j
+w = model.addVars(pairs, name="wij", vtype=gp.GRB.INTEGER, lb=0)          # flow from airport i to airport j that transfers at the hub
+y = model.addVars(K, name="y", vtype=gp.GRB.INTEGER, lb=0)               # number of aircraft of type k
 z = model.addVars( [(i, j, k) for (i, j) in pairs for k in K], name="zijk", vtype=gp.GRB.INTEGER, lb=0)         # number of flights from airport i to airport j with aircraft type k
 
 
-# Objective function: OLD
-# revenue = gp.quicksum( ( 5.9 * OD.loc[(i, j),"distance"] ** -0.76 + 0.043 ) * (x[(i, j)] + w[(i, j)]) 
-#                       for i in I 
-#                       for j in J
-#                         if i != j )
-
-# costs = gp.quicksum( 
-#     z[(i, j), k] * (
-#         AC.loc[k, "fixed_operating_cost"] 
-#         + AC.loc[k, "time_cost_parameter"] * (OD.loc[(i, j), "distance"] / AC.loc[k, "speed"]) 
-#         + AC.loc[k, "fuel_cost_parameter"] * fuel_cost * OD.loc[(i, j),"distance"] / 1.5)
-#                                    for i in I
-#                                    for j in J
-#                                    for k in K
-#                                    )
-# obj = revenue - costs
-# model.setObjective(obj, gp.MAXIMIZE)
-
-
-# Objective function: NEW
+# Objective function: 
 eps = 1e-6   # small number to avoid 0**negative
 
 # Revenue: sum over actual OD pairs only
 revenue = gp.quicksum(
-    (5.9 * (OD.loc[p, "distance"] + eps) ** (-0.76) + 0.043) * (x[p] + w[p])
+    (5.9 * (OD.loc[p, "distance"] + eps) ** (-0.76) + 0.043) * (x[p] + w[p]) * OD.loc[p, "distance"]
     for p in pairs
 )
 
@@ -266,85 +239,13 @@ model.setObjective(revenue - costs, gp.GRB.MAXIMIZE)
 # Contstraints
 
 # C1: number of transported passengers lower than demand
-# gp.addConstrs( ( x[(i, j)] + w[(i, j)] <= gp.quicksum( OD.loc[(i, j), "demand"])        
-#                 for i in I  
-#                 for j in J ), name="C1_Capacity")
-
-# x + w <= demand for each OD pair
-
-
-# C1*: w lower than demand
-# gp.addConstrs( (w[i, j] <= OD.loc[(i, j), "demand"] * AP.loc[j, "G"] * AP.loc[i, "G"]    
-#                 for i in I
-#                 for j in J ), name="C1*_Transfer_via_hub")
-
-
-
-# # C2: Capacity per flight
-# gp.addConstrs(  (x[(i, j)]                
-#                 for i in I
-#                 for j in J) + 
-#                 gp.quicksum( (w[i, m] * (1 - AP.loc[j, "G"]) +
-#                               w[m, j] * (1 - AP.loc[i, "G"]) ) 
-#                               for i in I
-#                               for j in J
-#                               for m in I if m != i and m != j )
-#                 <= gp.quicksum( 
-#                     z[(i, j), k] * AC.loc[k, "seats"] * LF 
-
-#                 for k in K  
-#                 for i in I 
-#                 for j in J)
-#  , name="C2_Flight_Capacity")
-
-# # C3: Every flight goes back and forth
-# gp.addConstrs( ( gp.quicksum( z[(i, j), k] for k in K ) == 
-#                  gp.quicksum( z[(j, i), k] for k in K ) 
-#                  for i in I 
-#                  for j in J ), name="C3_Round_Trip")
-
-
-
-# # C4: Fleet availability: Operating time is smaller than available time
-# gp.addConstrs(  gp.quicksum( (OD.loc[(i, j), "distance"] / AC.loc[k, "speed"] + (AC.loc[k, "avg_TAT"] * 1/60 * ( 1 + 0.5  * ( 1 - AP.loc[j, "G"]) ) ) * z[(i, j), k])
-#                              <= utilization_time * y[k]
-#                 for k in K
-#                 for i in I 
-#                 for j in J), name = "C4_Fleet_availability")    # Currently in hours, for a week of operation
-#                                                                 # TODO: check how to constrain per day not per week (currently don't know when flights happen)                   
-                
-# # C5: Range constraint
-# gp.addConstrs(  (z[(i, j), k] <= a_ijk[(i, j, k)] * y[k]
-#                 for i in I
-#                 for j in J
-#                 for k in K), name = "C5_Range_constraint")
-
-
-# # C6: All flights start or end at hub
-# gp.addConstrs( (z[(i, j), k] * (AP.loc[i, "G"] + AP.loc[j, "G"]) <= 1
-#              for i in I
-#              for j in J
-#              for k in K), name = "C6_Hub_constraint")
-
-# # C7 : Runway length constraint 
-# gp.addConstrs(( z[(i,j),k] * AC.loc[k, "runway_required"] <= AP.loc[j, "runway_length"]
-#                 for i in I
-#                 for j in J
-#                 for k in K), name = "C7_Runway_length_constraint")
-
-
-# # C8: Available slots for landing constraint
-# for j in J:
-#     gp.addConstr(
-#         gp.quicksum(z[(i,j), k] for i in I for k in K) <= AP.loc[j, "available_slots"],
-#         name=f"C8_Available_slots_{j}")
-
-# New constraints for pairs
-# C1: number of transported passengers lower than demand
 model.addConstrs(
     ( x[p] + w[p] <= OD.loc[p, "demand"] for p in pairs ),
     name="C1_Capacity"
 )
+
+for p in pairs:
+    print(f"transfer demand {p[0]} to {p[1]} is {OD.loc[p, 'demand'] }")
 
 # C1*: w lower than demand
 model.addConstrs(
@@ -355,19 +256,31 @@ model.addConstrs(
 # C2: Capacity per flight
 for (i, j) in pairs:
     model.addConstr(
-        x[(i, j)] + w[(i, j)]
+        x[(i, j)] + 
+            gp.quicksum( w[(i, m)] * (1 - AP.loc[j, "G"]) for m in AP.index if m != j if m != i)
+             + gp.quicksum( w[(m, j)] * ( 1- AP.loc[i, "G"]) for m in AP.index if m != j if m != i)
         <= gp.quicksum(z[i, j, k] * AC.loc[k, "seats"] * LF for k in K),
         name=f"C2_Capacity_{i}_{j}"
     )
 
 # C3: Every flight goes back and forth
-for (i,j) in pairs:
-    model.addConstr(
-            gp.quicksum(z[i, j, k] for k in K)
-            ==
-            gp.quicksum(z[j, i, k] for k in K),
-            name=f"C3_RoundTrip_{i}_{j}"
-        )
+#for (i,j) in pairs:
+for i in AP.index:
+    for k in K:
+        model.addConstr(
+                gp.quicksum(z[i, j, k] for j in AP.index if j != i)
+                ==
+                gp.quicksum(z[j, i, k] for j in AP.index if j != i),
+                name=f"C3_RoundTrip_{i}_{j}"
+            )
+        
+for i in AP.index:
+    for k in K:
+        for j in AP.index:
+            if i != j:
+                
+                print([i, j, k])
+        
     
 # C4: Fleet availability: Operating time is smaller than available time
 for k in K:
@@ -387,21 +300,23 @@ for k in K:
 for (i, j) in pairs:
     for k in K:
         model.addConstr(
-            z[i, j, k] <= a_ijk[(i, j, k)] * y[k],
+            z[i, j, k] <= a_ijk[(i, j, k)],
             name=f"C5_Range_{i}_{j}_{k}"
         )
+
 # C6: All flights start or end at hub
 for (i, j) in pairs:
     for k in K:
         model.addConstr(
-            z[i, j, k] * (AP.loc[i, "G"] + AP.loc[j, "G"]) <= 1,
+            z[i, j, k] * AP.loc[i, "G"] * AP.loc[j, "G"] <= 0.001,
             name=f"C6_Hub_{i}_{j}_{k}"
         )
+
 # C7 : Runway length constraint
 for (i, j) in pairs:
     for k in K:
         model.addConstr(
-            z[i, j, k] * AC.loc[k, "runway_required"] <= AP.loc[j, "runway_length"],
+            z[i, j, k] * AC.loc[k, "runway_required"] <= AP.loc[j, "runway_length"] *  z[i, j, k]  ,
             name=f"C7_Runway_{i}_{j}_{k}"
         )
 
@@ -418,6 +333,29 @@ if model.status == gp.GRB.OPTIMAL:
     print(f"Optimal objective value: {model.objVal}")
     for v in model.getVars():
         if v.X > 0:
+            # if v.VarName.startswith("wij"):
+                
             print(f"{v.VarName}: {v.X}")
 
 model.write("model.lp")  
+# After model.optimize()
+
+eps = 1e-12
+
+print("\n=== Binding / relevant constraints for non-zero z variables ===")
+
+# for var in model.getVars():
+#     if not var.VarName.startswith("z"):
+#         continue
+#     if abs(var.X) < eps:
+#         continue   # skip z == 0
+
+#     print(f"\nVariable {var.VarName} = {var.X}")
+
+    # for constr in model.getConstrs():
+    #     coef = model.getCoeff(constr, var)
+    #     if abs(coef) < eps:
+    #         continue  # variable not in this constraint
+
+    #     slack = constr.Slack
+    #     print(f"  - {constr.ConstrName}: coef={coef}, slack={slack}")
