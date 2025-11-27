@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 import statsmodels.api as sm
-from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import TwoSlopeNorm
 import seaborn as sns
 
@@ -96,7 +95,6 @@ def OLS(combined_data, distances, path_demand):
 
     X = sm.add_constant(X)
     model = sm.OLS(y, X).fit()          # Ordinary Least Squares regression
-    results = model.summary()
 
     ln_k = model.params['const']
     beta_1 = model.params['log_pop_product']
@@ -119,7 +117,7 @@ def OLS(combined_data, distances, path_demand):
         else:
             predicted_demand_dataframe.loc[i, j] = int(0)
 
-    return results, k, beta_1, beta_2, beta_3, predicted_demand_dataframe
+    return k, beta_1, beta_2, beta_3, predicted_demand_dataframe
 
 
 def forecast_population_GDP(pop_GDP_data):
@@ -173,7 +171,6 @@ def compare_demand_matrices(observed_demand, predicted_demand):
     as rows and columns. This function compares both matrices to verify the accuracy of the parameters obtained from the ordinary least squares method.
     This function create two heatmaps: one for the percentual difference between the observed and predicted demand, and one for the absolute difference.
     """ 
-
     signed_diff = predicted_demand - observed_demand            # Absolute difference between predicted and observed demand
 
     den = observed_demand.replace(0, np.nan)                    # Replace zeros with NaN to avoid division by zero for same origin-destination pairs
@@ -224,10 +221,9 @@ def __main__():
     """
     Main execution of all functions. Returns the future demand matrix for 2026.
     """
-
     pop_GDP_data, demand_data, airport_data = load_data(path_combined_data, path_demand, path_airports)
     distances = build_distance_matrix(path_airports, earth_radius)
-    results, k, beta_1, beta_2, beta_3, predicted_demand_dataframe = OLS(path_combined_data, distances, path_demand)
+    k, beta_1, beta_2, beta_3, predicted_demand_dataframe = OLS(path_combined_data, distances, path_demand)
     forecasted_population_GDP = forecast_population_GDP(pop_GDP_data)
     future_demand_matrix = future_demand_forecast(k, beta_1, beta_2, beta_3, forecasted_population_GDP, distances)
     compare_demand_matrices(demand_data, predicted_demand_dataframe)
