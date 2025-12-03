@@ -17,10 +17,6 @@ def get_data(path_flights, path_itineraries, path_recapture):
     return df_flights, df_itineraries, df_recapture
 """
 
-
-import pandas as pd
-import gurobipy as gp
-
 # ---------- DATA READING FUNCTIONS ----------
 
 def create_FLIGHTS(path):
@@ -28,13 +24,8 @@ def create_FLIGHTS(path):
     flights.xlsx:
         columns: ['flight_id', 'capacity', ...]
     """
-    df = pd.read_excel(path)
-    # Make sure 'flight_id' and 'capacity' match your sheet
-    df = df.set_index('Flight No.')
-    # Keep only capacity (you can keep more cols if useful)
-    FL = df[['Capacity']].copy()
+    FL = pd.read_excel(path, index_col="Flight No.", header=0)
     return FL
-
 
 def create_ITINERARIES(path, flights_index):
     """
@@ -47,44 +38,69 @@ def create_ITINERARIES(path, flights_index):
         DEL : dataframe δ_pi (rows = itineraries, cols = flights)
     """
     df = pd.read_excel(path)
+    # Set the index to the 'Itinerary' column and make them strings
+    df = pd.read_excel(path, dtype={'Itinerary': str})
     df = df.set_index('Itinerary')
 
     # parameter tables
     IT = df[['Price [EUR]', 'Demand']].copy()
 
-    # incidence matrix δ_pi: use the flight IDs as columns
-    DEL = df[flights_index].astype(float)
+    # Create empty incidence matrix
+    DEL = pd.DataFrame(0, index=df.index, columns=flights_index)
+
+    # For each itinerary, set 1 for the flights in 'Flight 1' and 'Flight 2'
+    for it in df.index:
+        f1 = df.loc[it, "Flight 1"]
+        f2 = df.loc[it, "Flight 2"]
+
+        if isinstance(f1, str) and f1 in flights_index:
+            DEL.loc[it, f1] = 1
+        if isinstance(f2, str) and f2 in flights_index:
+            DEL.loc[it, f2] = 1
+
     return IT, DEL
 
-
-def create_RECAPTURE(path):
+def create_RECAPTURE(path, P):
     """
     recapture.xlsx:
         columns: ['p', 'r', 'b_rp']
         p = original itinerary, r = itinerary used, b_rp = recapture rate
-    Returns:
-        B    : Series with MultiIndex (p,r) -> b_rp
-        PR   : list of (p,r) tuples (valid recapture pairs)
     """
-    df = pd.read_excel(path)
-    B = df.set_index(['From Itinerary', 'To Itinerary'])['Recapture Rate'].astype(float)
-    PR = list(B.index)    # list of (p,r) tuples
-    return B, PR
+
+    df = pd.read_excel(path, dtype={'From Itinerary': str, 'To Itinerary': str, 'Recapture Rate': float})
+
+    B = pd.DataFrame(index=P, columns=P, dtype=float)
+    for rows in df.itertuples(index=False):
+        p = rows[0]  # From Itinerary
+        r = rows[1]  # To Itinerary
+        b_rp = rows[2]  # Recapture Rate
+        B.loc[p, r] = b_rp
+
+    for p, r in itertools.product(P, P):
+        if p == r:
+            B.loc[p, r] = 1.0  # ensure b_pp = 1
+
+    B = B.fillna(0.0)  # fill NaN with 0    
+
+    return B
 
 
 # ---------- BUILD DATAFRAMES ----------
 
-FL = create_FLIGHTS(path_flights)
-IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
-B, PR = create_RECAPTURE(path_recapture)
 
 # Sets
+FL = create_FLIGHTS(path_flights)
 L = FL.index.tolist()       # flights i
+IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
 P = IT.index.tolist()       # itineraries p
 
-# Make sure DEL has rows P and columns L
-assert list(DEL.index) == P
-assert list(DEL.columns) == L
+# Recapture pairs (p, r)
+B = create_RECAPTURE(path_recapture, P)
+
+
+PR = [(p, r) for p in P for r in P if B.loc[p, r] == 1.0]
+
+print(PR)
 
 
 # ---------- GUROBI MODEL ----------
