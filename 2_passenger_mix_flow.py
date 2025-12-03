@@ -73,8 +73,8 @@ def create_RECAPTURE(path, P):
     for rows in df.itertuples(index=False):
         p = rows[0]  # From Itinerary
         r = rows[1]  # To Itinerary
-        b_rp = rows[2]  # Recapture Rate
-        B.loc[p, r] = b_rp
+        b_pr = rows[2]  # Recapture Rate
+        B.loc[p, r] = {"b_pr" : b_pr, "reduced_cost": None}  # store recapture rate
 
     for p, r in itertools.product(P, P):
         if p == r:
@@ -103,23 +103,46 @@ print(PR0)
 
 
 # ---------- Loop generating columns ----------
+columns = PR0.copy()
+running = True
+iteration = 0
 
 while running:
-
+    iteration += 1
     # solve function that solves model with given columns
+    duals = solve_model(columns)
 
     # calculate reduced costs based on duals
+    for (p, r) in PR0:
 
-    # select new columns wi
-h
+        reduced_cost = gp.quicksum(DEL.loc[i, p] - DEL.loc[i, r] * B.loc[p, r]["b_pr"]  *  duals["pi"][i] for i in FLi) 
+        + duals["sigma"][p] 
+        - (IT.loc[p, 'Price [EUR]'] - B.loc[p, r]["b_pr"] * IT.loc[r, 'Price [EUR]'] )
+        
+        B.loc[p, r]["reduced_cost"] = reduced_cost
 
+    # select new columns with the most negative reduced cost
+    pr_min_red_cost = np.argmin(B["reduced_cost"])
 
+    # Add selected columns to columns
+    columns.append(pr_min_red_cost)
 
+    # Print info
+    print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost]['reduced_cost']:.2f}")
 
+    # Write to file
+    with open("column_generation_log.txt", "a") as f:
+        f.write(f"Iteraion: {iteration}\t"
+                f"Selected column: {pr_min_red_cost}\t"
+                f"Reduced cost: {B.loc[pr_min_red_cost]['reduced_cost']:.2f}\t"
+                f"New columns: {columns}\t"
+                f"Duals: {duals}\t"
+                f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
+
+    # Check stopping criteria
+    if B.loc[pr_min_red_cost]["reduced_cost"] >= 0:
+        running = False
     
-    pass
-
-
 
 def solve_model(PR=PR0):
 

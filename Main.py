@@ -160,7 +160,7 @@ def create_AP(path):
     AP = pd.DataFrame(index=icao, columns=['runway_length', 'available_slots'], dtype=float)
     for i in range(len(icao)):
         AP.loc[icao[i], 'runway_length'] = runway_length[i]
-        if icao[i] == 'EDDM':  # Paris (LFPG) or Madrid (LEMF) airport as hub
+        if icao[i] == 'LEMF':  # Paris (LFPG) or Madrid (LEMF) airport as hub
             AP.loc[icao[i], 'G'] = 0
             AP.loc[icao[i], 'available_slots'] = 9999  # Infinite slots for hub
         else:
@@ -354,6 +354,8 @@ print("\n=== Binding / relevant constraints for non-zero z variables ===")
 When changing the Hub to EGLL, more than one flight per week is operated for some routes and AC2, 3 and 4 all have one aircraft.
 WHen increasing the yield for the madrid airport by a lot, more routes are served and with more AC. 
 WHen changing the 5.9 in the yield funtion to 200. THis is the result:
+Also add 70 hours operation constrain is a simplification.
+
 y[AC2]: 1.0
 y[AC3]: 4.0
 y[AC4]: 4.0
