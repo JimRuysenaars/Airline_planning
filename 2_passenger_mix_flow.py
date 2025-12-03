@@ -90,32 +90,52 @@ def create_RECAPTURE(path, P):
 
 # Sets
 FL = create_FLIGHTS(path_flights)
-L = FL.index.tolist()       # flights i
+FLi = FL.index.tolist()       # flights i
 IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
 P = IT.index.tolist()       # itineraries p
 
 # Recapture pairs (p, r)
 B = create_RECAPTURE(path_recapture, P)
 
+PR0 = [(p, r) for p in P for r in P if B.loc[p, r] == 1.0]
 
-PR = [(p, r) for p in P for r in P if B.loc[p, r] == 1.0]
+print(PR0)
 
-print(PR)
 
+# ---------- Loop generating columns ----------
+
+while running:
+
+    # solve function that solves model with given columns
+
+    # calculate reduced costs based on duals
+
+    # select new columns wi
+h
+
+
+
+
+    
+    pass
+
+
+
+def solve_model(PR=PR0):
 
 # ---------- GUROBI MODEL ----------
 
 model = gp.Model("Passenger_Mix_Flow")
 
-# Decision variables: x_rp = pax originally from p, flown on r
+# Decision variables: t_rp = pax originally from p, flown on r
 # Only create vars for recapture pairs listed in PR
-x = model.addVars(PR, name="x_rp", lb=0.0, vtype=gp.GRB.CONTINUOUS)
+t = model.addVars(PR, name="t_rp", lb=0.0, vtype=gp.GRB.CONTINUOUS)
 
 # ---------- Objective: max total revenue ----------
 
-# revenue = sum_{(p,r)} fare_r * x_rp
+# revenue = sum_{(p,r)} fare_r * t_rp
 revenue = gp.quicksum(
-    IT.loc[r, 'fare'] * x[p, r]
+    IT.loc[r, 'fare'] * t[p, r]
     for (p, r) in PR
 )
 
@@ -124,22 +144,18 @@ model.setObjective(revenue, gp.GRB.MAXIMIZE)
 # ---------- Constraints ----------
 
 # C1: seat capacity on each flight i
-for i in L:
+for i in FLi:
     model.addConstr(
         gp.quicksum(
-            DEL.loc[r, i] * x[p, r]
-            for (p, r) in PR
-        ) <= FL.loc[i, 'capacity'],
+            DEL.loc[i, p] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[i, p] * B.loc[p, r] * t[p, r] for (r, p) in PR)
+            <= IT.loc[i, 'Demand'] - FL.loc[i, 'Capacity'],
         name=f"C1_Capacity_{i}"
     )
 
-# C2: cannot reallocate more pax from itinerary p than its demand
+# C2: number of passengers is lower than the demand for each itinerary p
 for p in P:
     model.addConstr(
-        gp.quicksum(
-            x[p, r] / B[(p, r)]
-            for (pp, r) in PR if pp == p
-        ) <= IT.loc[p, 'demand'],
+        gp.quicksum(t[p, r] for r in P if (p, r) in PR) <= IT.loc[p, 'Demand'],
         name=f"C2_Demand_{p}"
     )
 
@@ -152,5 +168,5 @@ if model.status == gp.GRB.OPTIMAL:
     print(f"Optimal objective (revenue) = {model.objVal:.2f}")
     print("\nNon-zero flows x_rp:")
     for (p, r) in PR:
-        if x[p, r].X > 1e-6:
-            print(f"x[{p},{r}] = {x[p,r].X:.2f}")
+        if t[p, r].X > 1e-6:
+            print(f"x[{p},{r}] = {t[p,r].X:.2f}")
