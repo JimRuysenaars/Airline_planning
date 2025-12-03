@@ -8,15 +8,6 @@ path_flights = 'Problem 2 - Data/flights.xlsx'
 path_itineraries = 'Problem 2 - Data/itineraries.xlsx'
 path_recapture = 'Problem 2 - Data/recapture.xlsx'
 
-"""
-def get_data(path_flights, path_itineraries, path_recapture):
-    df_flights = pd.read_excel(path_flights, index_col=0, header=0)
-    df_itineraries = pd.read_excel(path_itineraries, index_col=0, header=0)
-    df_recapture = pd.read_excel(path_recapture, header=0)
-
-    return df_flights, df_itineraries, df_recapture
-"""
-
 # ---------- DATA READING FUNCTIONS ----------
 
 def create_FLIGHTS(path):
