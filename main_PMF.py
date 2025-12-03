@@ -63,24 +63,31 @@ def create_ITINERARIES(path, flights_index):
 def create_RECAPTURE(path, P):
     """
     recapture.xlsx:
-        columns: ['p', 'r', 'b_rp']
-        p = original itinerary, r = itinerary used, b_rp = recapture rate
+        columns: ['p', 'r', 'b_pr']
+        p = original itinerary, r = itinerary used, b_pr = recapture rate
     """
 
     df = pd.read_excel(path, dtype={'From Itinerary': str, 'To Itinerary': str, 'Recapture Rate': float})
 
-    B = pd.DataFrame(index=P, columns=P, dtype=float)
+    index = pd.MultiIndex.from_product([P, P], names=['p', 'r'])
+    B = pd.DataFrame(index=index, columns=['b_pr', 'reduced_cost'] , dtype=float)
+
+    B['b_pr'] = 0.0
+    B['reduced_cost'] = np.nan
+
     for rows in df.itertuples(index=False):
         p = rows[0]  # From Itinerary
         r = rows[1]  # To Itinerary
         b_pr = rows[2]  # Recapture Rate
-        B.loc[p, r] = {"b_pr" : b_pr, "reduced_cost": None}  # store recapture rate
+        if p in P and r in P:
+            B.loc[(p, r), 'b_pr'] = b_pr
+        # B.loc[p, r] = {"b_pr" : b_pr, "reduced_cost": None}  # store recapture rate
 
     for p, r in itertools.product(P, P):
         if p == r:
-            B.loc[p, r] = 1.0  # ensure b_pp = 1
+            B.loc[(p, r), 'b_pr'] = 1.0  # ensure b_pp = 1
 
-    B = B.fillna(0.0)  # fill NaN with 0    
+    B['b_pr'] = B['b_pr'].fillna(0.0)   # only for b_pr, leave reduced_cost NaN
 
     return B
 
@@ -97,7 +104,10 @@ P = IT.index.tolist()       # itineraries p
 # Recapture pairs (p, r)
 B = create_RECAPTURE(path_recapture, P)
 
-PR0 = [(p, r) for p in P for r in P if B.loc[p, r] == 1.0]
+# TODO: Pls fix
+PR0 = [(p, r) for (p, r), b in B['b_pr'].items() if b == 1.0]
+
+
 
 print(PR0)
 
@@ -113,50 +123,53 @@ while running:
     duals = solve_model(columns)
 
     # calculate reduced costs based on duals
-    for (p, r) in PR0:
+    for (p, r), b_pr in B['b_pr'].items():
+        if b_pr == 0:
+            continue
 
-        reduced_cost = gp.quicksum(DEL.loc[i, p] - DEL.loc[i, r] * B.loc[p, r]["b_pr"]  *  duals["pi"][i] for i in FLi) 
+        reduced_cost = (sum( (DEL.loc[p, i] - DEL.loc[r, i] * B.loc[(p, r), "b_pr"])  *  duals["pi"][i] 
+                            for i in FLi) 
         + duals["sigma"][p] 
-        - (IT.loc[p, 'Price [EUR]'] - B.loc[p, r]["b_pr"] * IT.loc[r, 'Price [EUR]'] )
+        - (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]'] )
+        )
         
-        B.loc[p, r]["reduced_cost"] = reduced_cost
-
+        B.loc[(p, r), "reduced_cost"] = reduced_cost
     # select new columns with the most negative reduced cost
-    pr_min_red_cost = np.argmin(B["reduced_cost"])
+    pr_min_red_cost = B["reduced_cost"].idxmin()
 
     # Add selected columns to columns
     columns.append(pr_min_red_cost)
 
     # Print info
-    print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost]['reduced_cost']:.2f}")
+    print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
 
     # Write to file
     with open("column_generation_log.txt", "a") as f:
-        f.write(f"Iteraion: {iteration}\t"
+        f.write(f"Iteration: {iteration}\t"
                 f"Selected column: {pr_min_red_cost}\t"
-                f"Reduced cost: {B.loc[pr_min_red_cost]['reduced_cost']:.2f}\t"
+                f"Reduced cost: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
                 f"New columns: {columns}\t"
                 f"Duals: {duals}\t"
                 f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
 
     # Check stopping criteria
-    if B.loc[pr_min_red_cost]["reduced_cost"] >= 0:
+    if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
         running = False
     
 
-def solve_model(PR=PR0):
+#def solve_model(PR=PR0):
 
 # ---------- GUROBI MODEL ----------
 
 model = gp.Model("Passenger_Mix_Flow")
 
-# Decision variables: t_rp = pax originally from p, flown on r
+# Decision variables: t_pr = pax originally from p, flown on r
 # Only create vars for recapture pairs listed in PR
-t = model.addVars(PR, name="t_rp", lb=0.0, vtype=gp.GRB.CONTINUOUS)
+t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.CONTINUOUS)
 
 # ---------- Objective: max total revenue ----------
 
-# revenue = sum_{(p,r)} fare_r * t_rp
+# revenue = sum_{(p,r)} fare_r * t_pr
 revenue = gp.quicksum(
     IT.loc[r, 'fare'] * t[p, r]
     for (p, r) in PR
@@ -182,14 +195,14 @@ for p in P:
         name=f"C2_Demand_{p}"
     )
 
-# (C3: x_rp >= 0 is already enforced by lb=0)
+# (C3: x_pr >= 0 is already enforced by lb=0)
 
 
 model.optimize()
 
 if model.status == gp.GRB.OPTIMAL:
     print(f"Optimal objective (revenue) = {model.objVal:.2f}")
-    print("\nNon-zero flows x_rp:")
+    print("\nNon-zero flows x_pr:")
     for (p, r) in PR:
         if t[p, r].X > 1e-6:
             print(f"x[{p},{r}] = {t[p,r].X:.2f}")
