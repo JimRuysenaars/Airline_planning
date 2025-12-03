@@ -135,7 +135,7 @@ def create_OD(path_distance, path_demand):
         else:
             distance = Distance_matrix.loc[i, j]  
             demand   = Demand_matrix.loc[i, j]
-            yield_   = 5.9 * distance ** -0.76 + 0.043 if distance > 0 else 0  # Avoid division by zero
+            yield_   = 5.9 * distance ** -0.76 + 0.043 if distance > 0 else 0  # Avoid division by zero 5.9
 
             rows.append({
                 "i": i,
@@ -160,7 +160,7 @@ def create_AP(path):
     AP = pd.DataFrame(index=icao, columns=['runway_length', 'available_slots'], dtype=float)
     for i in range(len(icao)):
         AP.loc[icao[i], 'runway_length'] = runway_length[i]
-        if icao[i] == 'LEMF':  # Madrid airport as hub
+        if icao[i] == 'EDDM':  # Paris (LFPG) or Madrid (LEMF) airport as hub
             AP.loc[icao[i], 'G'] = 0
             AP.loc[icao[i], 'available_slots'] = 9999  # Infinite slots for hub
         else:
@@ -190,7 +190,7 @@ AC = create_AC('Problem 1 - Data\\AircraftData.xlsx')
 OD = create_OD('Problem 1 - Data\\airport_data.xlsx', 'Problem 1 - Data\\demand_per_week.xlsx')
 AP = create_AP('Problem 1 - Data\\airport_data.xlsx')
 a_ijk = build_a_ijk(OD, AC)
-print(AC)
+
 
 # Initialize gurobipy model
 model = gp.Model("Airline_Planning")
@@ -244,9 +244,6 @@ model.addConstrs(
     name="C1_Capacity"
 )
 
-for p in pairs:
-    print(f"transfer demand {p[0]} to {p[1]} is {OD.loc[p, 'demand'] }")
-
 # C1*: w lower than demand
 model.addConstrs(
     ( w[p] <= OD.loc[p, "demand"] * AP.loc[p[1], "G"] * AP.loc[p[0], "G"] for p in pairs ),
@@ -271,17 +268,9 @@ for i in AP.index:
                 gp.quicksum(z[i, j, k] for j in AP.index if j != i)
                 ==
                 gp.quicksum(z[j, i, k] for j in AP.index if j != i),
-                name=f"C3_RoundTrip_{i}_{j}"
+                name=f"C3_RoundTrip_{i}_{k}"
             )
         
-for i in AP.index:
-    for k in K:
-        for j in AP.index:
-            if i != j:
-                
-                print([i, j, k])
-        
-    
 # C4: Fleet availability: Operating time is smaller than available time
 for k in K:
     model.addConstr(
@@ -359,3 +348,67 @@ print("\n=== Binding / relevant constraints for non-zero z variables ===")
 
     #     slack = constr.Slack
     #     print(f"  - {constr.ConstrName}: coef={coef}, slack={slack}")
+
+
+'''
+When changing the Hub to EGLL, more than one flight per week is operated for some routes and AC2, 3 and 4 all have one aircraft.
+WHen increasing the yield for the madrid airport by a lot, more routes are served and with more AC. 
+WHen changing the 5.9 in the yield funtion to 200. THis is the result:
+y[AC2]: 1.0
+y[AC3]: 4.0
+y[AC4]: 4.0
+zijk[BIKF,LEMF,AC3]: 2.0
+zijk[EDDF,LEMF,AC4]: 6.0
+zijk[EDDM,LEMF,AC2]: 1.0
+zijk[EDDM,LEMF,AC3]: 5.0
+zijk[EDDM,LEMF,AC4]: 4.0
+zijk[EDDT,LEMF,AC4]: 1.0
+zijk[EFHK,LEMF,AC3]: 1.0
+zijk[EFHK,LEMF,AC4]: 2.0
+zijk[EGLL,LEMF,AC3]: 5.0
+zijk[EGLL,LEMF,AC4]: 10.0
+zijk[EGPH,LEMF,AC3]: 2.0
+zijk[EHAM,LEMF,AC4]: 1.0
+zijk[EIDW,LEMF,AC4]: 3.0
+zijk[EPWA,LEMF,AC3]: 3.0
+zijk[ESSA,LEMF,AC4]: 3.0
+zijk[LEBL,LEMF,AC4]: 3.0
+zijk[LEMF,BIKF,AC3]: 2.0
+zijk[LEMF,EDDF,AC4]: 6.0
+zijk[LEMF,EDDM,AC2]: 1.0
+zijk[LEMF,EDDM,AC3]: 5.0
+zijk[LEMF,EDDM,AC4]: 4.0
+zijk[LEMF,EDDT,AC4]: 1.0
+zijk[LEMF,EFHK,AC3]: 1.0
+zijk[LEMF,EFHK,AC4]: 2.0
+zijk[LEMF,EGLL,AC3]: 5.0
+zijk[LEMF,EGLL,AC4]: 10.0
+zijk[LEMF,EGPH,AC3]: 2.0
+zijk[LEMF,EHAM,AC4]: 1.0
+zijk[LEMF,EIDW,AC4]: 3.0
+zijk[LEMF,EPWA,AC3]: 3.0
+zijk[LEMF,ESSA,AC4]: 3.0
+zijk[LEMF,LEBL,AC4]: 3.0
+zijk[LEMF,LFPG,AC3]: 1.0
+zijk[LEMF,LFPG,AC4]: 9.0
+zijk[LEMF,LGIR,AC2]: 1.0
+zijk[LEMF,LGIR,AC3]: 1.0
+zijk[LEMF,LICJ,AC3]: 3.0
+zijk[LEMF,LIRF,AC3]: 8.0
+zijk[LEMF,LIRF,AC4]: 2.0
+zijk[LEMF,LPMA,AC3]: 2.0
+zijk[LEMF,LPPT,AC3]: 2.0
+zijk[LEMF,LPPT,AC4]: 1.0
+zijk[LEMF,LROP,AC3]: 3.0
+zijk[LFPG,LEMF,AC3]: 1.0
+zijk[LFPG,LEMF,AC4]: 9.0
+zijk[LGIR,LEMF,AC2]: 1.0
+zijk[LGIR,LEMF,AC3]: 1.0
+zijk[LICJ,LEMF,AC3]: 3.0
+zijk[LIRF,LEMF,AC3]: 8.0
+zijk[LIRF,LEMF,AC4]: 2.0
+zijk[LPMA,LEMF,AC3]: 2.0
+zijk[LPPT,LEMF,AC3]: 2.0
+zijk[LPPT,LEMF,AC4]: 1.0
+zijk[LROP,LEMF,AC3]: 3.0
+'''
