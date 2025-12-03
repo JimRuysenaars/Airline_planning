@@ -1,6 +1,6 @@
 \ Model Passenger_Mix_Flow
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0x843c7b34d66e0316
+\ Signature: 0x843c7b34d66dffee
 Minimize
   42 t_pr[0,artificial] + 65 t_pr[1,artificial] + 68 t_pr[2,artificial]
    + 43 t_pr[3,artificial] + 56 t_pr[4,artificial] + 42 t_pr[5,artificial]

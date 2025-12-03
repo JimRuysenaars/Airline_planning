@@ -91,30 +91,128 @@ def create_RECAPTURE(path, P):
 
     return B
 
+def create_Q(DEL, IT):
+    # Create an empty Q dataframe indexed by flight IDs
+    Q = pd.DataFrame(0.0, index=DEL.columns, columns=["Q"])
+
+    # Loop over each flight (column of DEL)
+    for flight in DEL.columns:
+
+        total_demand = 0.0
+
+        # Loop over each itinerary (row of DEL)
+        for it in DEL.index:
+
+            delta = DEL.loc[it, flight]      # 0 or 1
+            demand = IT.loc[it, "Demand"]    # D_p
+
+            total_demand += delta * demand
+
+        # Store in Q
+        Q.loc[flight, "Q"] = total_demand
+
+    return Q
+
+def make_PR0_list(P):
+    PR = [(p, p) for p in P]
+    PR += [(p, "artificial") for p in P]
+    PR0 = list(dict.fromkeys(PR))
+    return PR0
 
 # ---------- BUILD DATAFRAMES ----------
 
-
 # Sets
 FL = create_FLIGHTS(path_flights)
-FLi = FL.index.tolist()       # flights i
+L = FL.index.tolist()       # flights i
 IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
 P = IT.index.tolist()       # itineraries p
+Qi = create_Q(DEL, IT)
 
 # Recapture pairs (p, r)
 B = create_RECAPTURE(path_recapture, P)
 
 # TODO: Pls fix
-PR0 = [(p, r) for (p, r), b in B['b_pr'].items() if b == 1.0]
-
-
-
+PR0 = make_PR0_list(P)
 print(PR0)
 
 
+# ---------- GUROBI MODEL ----------
+
+def solve_model(PR=PR0):
+
+    # ---------- GUROBI MODEL ----------
+
+    model = gp.Model("Passenger_Mix_Flow")
+
+    # Decision variables: t_pr = pax originally from p, flown on r
+    # Only create vars for recapture pairs listed in PR
+    t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.INTEGER)
+
+    # ---------- Objective: max total revenue ----------
+
+    # revenue = sum_{(p,r)} fare_r * t_pr
+    lost_revenue = gp.quicksum(
+        (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]']) * t[p, r]
+        for (p, r) in PR
+    )
+
+    model.setObjective(lost_revenue, gp.GRB.MINIMIZE)
+
+    # ---------- Constraints ----------
+    
+    # C1: seat capacity on each flight i
+    for i in L:
+        model.addConstr(
+            gp.quicksum(
+                DEL.loc[p, i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR if r != 'artificial')
+                >= Qi.loc[i, "Q"] - FL.loc[i, 'Capacity'],
+            name=f"C1_Capacity_{i}"
+        )
+
+    # C2: number of passengers is lower than the demand for each itinerary p
+    for p in P:
+        model.addConstr(
+            gp.quicksum(t[p, r] for r in P if (p, r) in PR) <= IT.loc[p, 'Demand'],
+            name=f"C2_Demand_{p}"
+        )
+
+    # C3: number of passengers is positive
+    for (p, r) in PR:
+        model.addConstr(
+            t[p, r] >= 0.0,
+            name=f"C3_NonNegativity_{p}_{r}"
+        )
+
+    # ---------- Optimize model ----------
+    model.optimize()
+    sum = 0
+    if model.status == gp.GRB.OPTIMAL:
+        print(f"Optimal objective (revenue) = {model.objVal:.2f}")
+        print("\nNon-zero flows t_rp:")
+        for (p, r) in PR:
+            if t[p, r].X > 1e-6:
+                sum += t[p, r].X
+                print(f"t[{p},{r}] = {t[p,r].X:.2f}")
+
+    model.write("model_part2.lp")  
+
+
+solve_model()
+
+
+"""
+TODO: don't forget to check that the initial PR given to the solve_model function includes the artificial itineraties
+        -> using the function written for it: extend_DV nogwat
+
+TODO: Finish the solve_model function by havin it return dual values in correct format
+"""
+
+
 # ---------- Loop generating columns ----------
+print(solve_model(PR0))
+
 columns = PR0.copy()
-running = True
+running = False
 iteration = 0
 
 while running:
@@ -128,7 +226,7 @@ while running:
             continue
 
         reduced_cost = (sum( (DEL.loc[p, i] - DEL.loc[r, i] * B.loc[(p, r), "b_pr"])  *  duals["pi"][i] 
-                            for i in FLi) 
+                            for i in L) 
         + duals["sigma"][p] 
         - (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]'] )
         )
@@ -155,54 +253,3 @@ while running:
     # Check stopping criteria
     if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
         running = False
-    
-
-#def solve_model(PR=PR0):
-
-# ---------- GUROBI MODEL ----------
-
-model = gp.Model("Passenger_Mix_Flow")
-
-# Decision variables: t_pr = pax originally from p, flown on r
-# Only create vars for recapture pairs listed in PR
-t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.CONTINUOUS)
-
-# ---------- Objective: max total revenue ----------
-
-# revenue = sum_{(p,r)} fare_r * t_pr
-revenue = gp.quicksum(
-    IT.loc[r, 'fare'] * t[p, r]
-    for (p, r) in PR
-)
-
-model.setObjective(revenue, gp.GRB.MAXIMIZE)
-
-# ---------- Constraints ----------
-
-# C1: seat capacity on each flight i
-for i in FLi:
-    model.addConstr(
-        gp.quicksum(
-            DEL.loc[i, p] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[i, p] * B.loc[p, r] * t[p, r] for (r, p) in PR)
-            <= IT.loc[i, 'Demand'] - FL.loc[i, 'Capacity'],
-        name=f"C1_Capacity_{i}"
-    )
-
-# C2: number of passengers is lower than the demand for each itinerary p
-for p in P:
-    model.addConstr(
-        gp.quicksum(t[p, r] for r in P if (p, r) in PR) <= IT.loc[p, 'Demand'],
-        name=f"C2_Demand_{p}"
-    )
-
-# (C3: x_pr >= 0 is already enforced by lb=0)
-
-
-model.optimize()
-
-if model.status == gp.GRB.OPTIMAL:
-    print(f"Optimal objective (revenue) = {model.objVal:.2f}")
-    print("\nNon-zero flows x_pr:")
-    for (p, r) in PR:
-        if t[p, r].X > 1e-6:
-            print(f"x[{p},{r}] = {t[p,r].X:.2f}")
