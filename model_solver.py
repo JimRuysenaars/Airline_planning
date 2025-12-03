@@ -7,6 +7,8 @@ path_flights = 'Problem 2 - Data/flights.xlsx'
 path_itineraries = 'Problem 2 - Data/itineraries.xlsx'
 path_recapture = 'Problem 2 - Data/recapture.xlsx'
 
+running = True
+
 def create_FLIGHTS(path):
     """
     flights.xlsx:
@@ -71,42 +73,55 @@ def create_RECAPTURE(path, P):
 
     return B
 
+def make_PR0_list(PR):
+    PR = [(p, p) for p in P]
+    PR += [(p, "artificial") for p in P]
+    PR0 = list(dict.fromkeys(PR))
+    return PR0
+
+def create_Q(DEL, IT):
+    # Create an empty Q dataframe indexed by flight IDs
+    Q = pd.DataFrame(0.0, index=DEL.columns, columns=["Q"])
+
+    # Loop over each flight (column of DEL)
+    for flight in DEL.columns:
+
+        total_demand = 0.0
+
+        # Loop over each itinerary (row of DEL)
+        for it in DEL.index:
+
+            delta = DEL.loc[it, flight]      # 0 or 1
+            demand = IT.loc[it, "Demand"]    # D_p
+
+            total_demand += delta * demand
+
+        # Store in Q
+        Q.loc[flight, "Q"] = total_demand
+
+    return Q
 
 # ---------- BUILD DATAFRAMES ----------
 
-
 # Sets
 FL = create_FLIGHTS(path_flights)
-FLi = FL.index.tolist()       # flights i
+L = FL.index.tolist()       # flights i
 IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
 P = IT.index.tolist()       # itineraries p
+Qi = create_Q(DEL, IT)
 
 # Recapture pairs (p, r)
 B = create_RECAPTURE(path_recapture, P)
 
-PR0 = [(p, r) for p in P for r in P if B.loc[p, r] == 1.0]
 
-print(PR0)
+# Preferred itineraries only
+PR0 = make_PR0_list(P)
 
-
-# ---------- Loop generating columns ----------
-
-while running:
-
-    # solve function that solves model with given columns
-
-    # calculate reduced costs based on duals
-
-    # select new columns wi
-h
+print("B for 4,artificial is:", B.loc['4','artificial'])
 
 
-
-
-    
-    pass
-
-
+# print(DEL.loc[P[0], L[0]])
+# print(PR0)
 
 def solve_model(PR=PR0):
 
@@ -114,28 +129,28 @@ def solve_model(PR=PR0):
 
     model = gp.Model("Passenger_Mix_Flow")
 
-    # Decision variables: t_rp = pax originally from p, flown on r
+    # Decision variables: t_pr = pax originally from p, flown on r
     # Only create vars for recapture pairs listed in PR
-    t = model.addVars(PR, name="t_rp", lb=0.0, vtype=gp.GRB.CONTINUOUS)
+    t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.INTEGER)
 
     # ---------- Objective: max total revenue ----------
 
-    # revenue = sum_{(p,r)} fare_r * t_rp
-    revenue = gp.quicksum(
-        IT.loc[r, 'fare'] * t[p, r]
+    # revenue = sum_{(p,r)} fare_r * t_pr
+    lost_revenue = gp.quicksum(
+        (IT.loc[p, 'Price [EUR]'] - B.loc[p, r] * IT.loc[r, 'Price [EUR]']) * t[p, r]
         for (p, r) in PR
     )
 
-    model.setObjective(revenue, gp.GRB.MAXIMIZE)
+    model.setObjective(lost_revenue, gp.GRB.MINIMIZE)
 
     # ---------- Constraints ----------
-
+    
     # C1: seat capacity on each flight i
-    for i in FLi:
+    for i in L:
         model.addConstr(
             gp.quicksum(
-                DEL.loc[i, p] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[i, p] * B.loc[r, p] * t[r, p] for (r, p) in PR)
-                <= IT.loc[i, 'Demand'] - FL.loc[i, 'Capacity'],
+                DEL.loc[p, i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[r, p] * t[r, p] for (p, r) in PR if r != 'artificial')
+                >= Qi.loc[i, "Q"] - FL.loc[i, 'Capacity'],
             name=f"C1_Capacity_{i}"
         )
 
@@ -155,10 +170,22 @@ def solve_model(PR=PR0):
 
     # ---------- Optimize model ----------
     model.optimize()
-
+    sum = 0
     if model.status == gp.GRB.OPTIMAL:
         print(f"Optimal objective (revenue) = {model.objVal:.2f}")
-        print("\nNon-zero flows x_rp:")
+        print("\nNon-zero flows t_rp:")
         for (p, r) in PR:
             if t[p, r].X > 1e-6:
-                print(f"x[{p},{r}] = {t[p,r].X:.2f}")
+                sum += t[p, r].X
+                print(f"t[{p},{r}] = {t[p,r].X:.2f}")
+
+    model.write("model_part2.lp")  
+
+
+solve_model()
+
+
+"""
+TODO: don't forget to check that the initial PR given to the solve_model function includes the artificial itineraties
+        -> using the function written for it: extend_DV nogwat
+"""
