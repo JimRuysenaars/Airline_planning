@@ -110,6 +110,11 @@ def make_PR0_list(P):
     PR0 = list(dict.fromkeys(PR))
     return PR0
 
+def make_PR_total_list(P):
+    PR = [(p, r) for p in P for r in P]
+    # PR += [(p, "artificial") for p in P]
+    PR_total = list(dict.fromkeys(PR))
+    return PR_total
 # ---------- BUILD DATAFRAMES ----------
 
 # Sets
@@ -202,7 +207,8 @@ def solve_model(PR):
     return duals
 
 
-# print(solve_model(PR0))
+
+# print(solve_model(make_PR_total_list(P)))
 
 """
 TODO: don't forget to check that the initial PR given to the solve_model function includes the artificial itineraties
@@ -213,7 +219,7 @@ TODO: Finish the solve_model function by havin it return dual values in correct 
 
 # ---------- Loop generating columns ----------
 
-
+history = []
 columns = PR0.copy()
 running = True
 iteration = 0
@@ -244,6 +250,7 @@ while running:
     for (p, r), b_pr in B['b_pr'].items()
     if b_pr != 0]
     
+
     value = [item['reduced_cost'] for item in reduced_costs if item['pair'] == ('15', '16')]
     print("Reduced cost:", value)
 
@@ -266,7 +273,14 @@ while running:
             pr_min_red_cost = reduced_costs[0]['pair']
             pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
 
-            
+
+    history.append({
+        "iteration": iteration,
+        "columns_in_model": list(columns),
+        "reduced_costs": { (p,r): B.loc[(p,r),"reduced_cost"] for (p,r) in B.index },
+        "chosen_column": pr_min_red_cost,
+        "chosen_column_reverse": pr_min_red_cost_reverse,
+    })      
         
     # Print info
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
@@ -283,3 +297,10 @@ while running:
     # Check stopping criteria
     if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
         running = False
+
+
+df_history = pd.DataFrame(history)
+df_history.to_excel("cg_iterations.xlsx", index=False)
+
+
+

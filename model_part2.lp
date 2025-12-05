@@ -1,6 +1,6 @@
 \ Model Passenger_Mix_Flow
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0x153bfdef752f0b99
+\ Signature: 0x254f2684593b6c2f
 Minimize
   42 t_pr[0,artificial] + 65 t_pr[1,artificial] + 68 t_pr[2,artificial]
    + 43 t_pr[3,artificial] + 56 t_pr[4,artificial] + 42 t_pr[5,artificial]
@@ -65,17 +65,16 @@ Minimize
    + 251 t_pr[123,artificial] + 228 t_pr[124,artificial]
    + 92.83 t_pr[16,15] + 20.06 t_pr[15,16] + 53.2 t_pr[25,24]
    + 42.22 t_pr[24,25] + 49.08 t_pr[25,26] + 29.84 t_pr[26,25]
-   + 47.64 t_pr[25,27] + 51 t_pr[27,25] + 59.84 t_pr[1,3] + 43 t_pr[3,1]
-   + 53.66 t_pr[1,7] + 42 t_pr[7,1]
+   + 47.64 t_pr[25,27] + 51 t_pr[27,25]
 Subject To
  C1_Capacity_SS1002: t_pr[0,artificial] >= 83
- C1_Capacity_SS1031: t_pr[1,artificial] + t_pr[1,3] + t_pr[1,7] >= -97
+ C1_Capacity_SS1031: t_pr[1,artificial] >= -97
  C1_Capacity_SS1060: t_pr[2,artificial] >= 15
- C1_Capacity_SS1105: t_pr[3,artificial] - 0.12 t_pr[1,3] + t_pr[3,1] >= 96
+ C1_Capacity_SS1105: t_pr[3,artificial] >= 96
  C1_Capacity_SS1134: t_pr[4,artificial] >= -12
  C1_Capacity_SS1161: t_pr[5,artificial] >= -21
  C1_Capacity_SS1197: t_pr[6,artificial] >= -90
- C1_Capacity_SS1225: t_pr[7,artificial] - 0.27 t_pr[1,7] + t_pr[7,1] >= 91
+ C1_Capacity_SS1225: t_pr[7,artificial] >= 91
  C1_Capacity_SS1242: t_pr[8,artificial] >= 34
  C1_Capacity_SS1274: t_pr[9,artificial] >= 23
  C1_Capacity_SS1300: t_pr[10,artificial] >= 2
@@ -192,13 +191,13 @@ Subject To
    + t_pr[121,artificial] + t_pr[122,artificial] + t_pr[123,artificial]
    + t_pr[124,artificial] >= 85
  C2_Demand_0: t_pr[0,0] + t_pr[0,artificial] <= 233
- C2_Demand_1: t_pr[1,1] + t_pr[1,artificial] + t_pr[1,3] + t_pr[1,7] <= 53
+ C2_Demand_1: t_pr[1,1] + t_pr[1,artificial] <= 53
  C2_Demand_2: t_pr[2,2] + t_pr[2,artificial] <= 165
- C2_Demand_3: t_pr[3,3] + t_pr[3,artificial] + t_pr[3,1] <= 246
+ C2_Demand_3: t_pr[3,3] + t_pr[3,artificial] <= 246
  C2_Demand_4: t_pr[4,4] + t_pr[4,artificial] <= 138
  C2_Demand_5: t_pr[5,5] + t_pr[5,artificial] <= 129
  C2_Demand_6: t_pr[6,6] + t_pr[6,artificial] <= 60
- C2_Demand_7: t_pr[7,7] + t_pr[7,artificial] + t_pr[7,1] <= 241
+ C2_Demand_7: t_pr[7,7] + t_pr[7,artificial] <= 241
  C2_Demand_8: t_pr[8,8] + t_pr[8,artificial] <= 184
  C2_Demand_9: t_pr[9,9] + t_pr[9,artificial] <= 173
  C2_Demand_10: t_pr[10,10] + t_pr[10,artificial] <= 152
@@ -577,9 +576,5 @@ Subject To
  C3_NonNegativity_26_25: t_pr[26,25] >= 0
  C3_NonNegativity_25_27: t_pr[25,27] >= 0
  C3_NonNegativity_27_25: t_pr[27,25] >= 0
- C3_NonNegativity_1_3: t_pr[1,3] >= 0
- C3_NonNegativity_3_1: t_pr[3,1] >= 0
- C3_NonNegativity_1_7: t_pr[1,7] >= 0
- C3_NonNegativity_7_1: t_pr[7,1] >= 0
 Bounds
 End
