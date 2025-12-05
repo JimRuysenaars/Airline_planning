@@ -1,6 +1,6 @@
 \ Model Passenger_Mix_Flow
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0x843c7b34d66dffee
+\ Signature: 0x153bfdef752f0b99
 Minimize
   42 t_pr[0,artificial] + 65 t_pr[1,artificial] + 68 t_pr[2,artificial]
    + 43 t_pr[3,artificial] + 56 t_pr[4,artificial] + 42 t_pr[5,artificial]
@@ -63,15 +63,19 @@ Minimize
    + 226 t_pr[119,artificial] + 285 t_pr[120,artificial]
    + 271 t_pr[121,artificial] + 235 t_pr[122,artificial]
    + 251 t_pr[123,artificial] + 228 t_pr[124,artificial]
+   + 92.83 t_pr[16,15] + 20.06 t_pr[15,16] + 53.2 t_pr[25,24]
+   + 42.22 t_pr[24,25] + 49.08 t_pr[25,26] + 29.84 t_pr[26,25]
+   + 47.64 t_pr[25,27] + 51 t_pr[27,25] + 59.84 t_pr[1,3] + 43 t_pr[3,1]
+   + 53.66 t_pr[1,7] + 42 t_pr[7,1]
 Subject To
  C1_Capacity_SS1002: t_pr[0,artificial] >= 83
- C1_Capacity_SS1031: t_pr[1,artificial] >= -97
+ C1_Capacity_SS1031: t_pr[1,artificial] + t_pr[1,3] + t_pr[1,7] >= -97
  C1_Capacity_SS1060: t_pr[2,artificial] >= 15
- C1_Capacity_SS1105: t_pr[3,artificial] >= 96
+ C1_Capacity_SS1105: t_pr[3,artificial] - 0.12 t_pr[1,3] + t_pr[3,1] >= 96
  C1_Capacity_SS1134: t_pr[4,artificial] >= -12
  C1_Capacity_SS1161: t_pr[5,artificial] >= -21
  C1_Capacity_SS1197: t_pr[6,artificial] >= -90
- C1_Capacity_SS1225: t_pr[7,artificial] >= 91
+ C1_Capacity_SS1225: t_pr[7,artificial] - 0.27 t_pr[1,7] + t_pr[7,1] >= 91
  C1_Capacity_SS1242: t_pr[8,artificial] >= 34
  C1_Capacity_SS1274: t_pr[9,artificial] >= 23
  C1_Capacity_SS1300: t_pr[10,artificial] >= 2
@@ -81,8 +85,9 @@ Subject To
  C1_Capacity_SS1437: t_pr[14,artificial] >= 13
  C1_Capacity_SS1454: t_pr[15,artificial] + t_pr[90,artificial]
    + t_pr[91,artificial] + t_pr[92,artificial] + t_pr[93,artificial]
-   >= 1004
- C1_Capacity_SS1480: t_pr[16,artificial] >= -98
+   - 0.31 t_pr[16,15] + t_pr[15,16] >= 1004
+ C1_Capacity_SS1480: t_pr[16,artificial] + t_pr[16,15] - 0.69 t_pr[15,16]
+   >= -98
  C1_Capacity_SS1529: t_pr[17,artificial] >= 592
  C1_Capacity_SS1557: t_pr[18,artificial] >= -133
  C1_Capacity_SS1578: t_pr[19,artificial] >= -83
@@ -90,10 +95,14 @@ Subject To
  C1_Capacity_SS1643: t_pr[21,artificial] >= -130
  C1_Capacity_SS1668: t_pr[22,artificial] >= 1
  C1_Capacity_SS1706: t_pr[23,artificial] >= -45
- C1_Capacity_SS1729: t_pr[24,artificial] >= 127
- C1_Capacity_SS1752: t_pr[25,artificial] >= -60
- C1_Capacity_SS1793: t_pr[26,artificial] >= 56
- C1_Capacity_SS1816: t_pr[27,artificial] >= 58
+ C1_Capacity_SS1729: t_pr[24,artificial] - 0.2 t_pr[25,24] + t_pr[24,25]
+   >= 127
+ C1_Capacity_SS1752: t_pr[25,artificial] + t_pr[25,24] - 0.33 t_pr[24,25]
+   + t_pr[25,26] - 0.26 t_pr[26,25] + t_pr[25,27] >= -60
+ C1_Capacity_SS1793: t_pr[26,artificial] - 0.36 t_pr[25,26] + t_pr[26,25]
+   >= 56
+ C1_Capacity_SS1816: t_pr[27,artificial] - 0.36 t_pr[25,27] + t_pr[27,25]
+   >= 58
  C1_Capacity_SS1848: t_pr[28,artificial] >= 221
  C1_Capacity_SS1881: t_pr[29,artificial] >= -85
  C1_Capacity_SS1911: t_pr[30,artificial] + t_pr[94,artificial]
@@ -183,13 +192,13 @@ Subject To
    + t_pr[121,artificial] + t_pr[122,artificial] + t_pr[123,artificial]
    + t_pr[124,artificial] >= 85
  C2_Demand_0: t_pr[0,0] + t_pr[0,artificial] <= 233
- C2_Demand_1: t_pr[1,1] + t_pr[1,artificial] <= 53
+ C2_Demand_1: t_pr[1,1] + t_pr[1,artificial] + t_pr[1,3] + t_pr[1,7] <= 53
  C2_Demand_2: t_pr[2,2] + t_pr[2,artificial] <= 165
- C2_Demand_3: t_pr[3,3] + t_pr[3,artificial] <= 246
+ C2_Demand_3: t_pr[3,3] + t_pr[3,artificial] + t_pr[3,1] <= 246
  C2_Demand_4: t_pr[4,4] + t_pr[4,artificial] <= 138
  C2_Demand_5: t_pr[5,5] + t_pr[5,artificial] <= 129
  C2_Demand_6: t_pr[6,6] + t_pr[6,artificial] <= 60
- C2_Demand_7: t_pr[7,7] + t_pr[7,artificial] <= 241
+ C2_Demand_7: t_pr[7,7] + t_pr[7,artificial] + t_pr[7,1] <= 241
  C2_Demand_8: t_pr[8,8] + t_pr[8,artificial] <= 184
  C2_Demand_9: t_pr[9,9] + t_pr[9,artificial] <= 173
  C2_Demand_10: t_pr[10,10] + t_pr[10,artificial] <= 152
@@ -197,8 +206,8 @@ Subject To
  C2_Demand_12: t_pr[12,12] + t_pr[12,artificial] <= 99
  C2_Demand_13: t_pr[13,13] + t_pr[13,artificial] <= 88
  C2_Demand_14: t_pr[14,14] + t_pr[14,artificial] <= 163
- C2_Demand_15: t_pr[15,15] + t_pr[15,artificial] <= 302
- C2_Demand_16: t_pr[16,16] + t_pr[16,artificial] <= 52
+ C2_Demand_15: t_pr[15,15] + t_pr[15,artificial] + t_pr[15,16] <= 302
+ C2_Demand_16: t_pr[16,16] + t_pr[16,artificial] + t_pr[16,15] <= 52
  C2_Demand_17: t_pr[17,17] + t_pr[17,artificial] <= 742
  C2_Demand_18: t_pr[18,18] + t_pr[18,artificial] <= 17
  C2_Demand_19: t_pr[19,19] + t_pr[19,artificial] <= 67
@@ -206,10 +215,11 @@ Subject To
  C2_Demand_21: t_pr[21,21] + t_pr[21,artificial] <= 20
  C2_Demand_22: t_pr[22,22] + t_pr[22,artificial] <= 151
  C2_Demand_23: t_pr[23,23] + t_pr[23,artificial] <= 105
- C2_Demand_24: t_pr[24,24] + t_pr[24,artificial] <= 277
- C2_Demand_25: t_pr[25,25] + t_pr[25,artificial] <= 90
- C2_Demand_26: t_pr[26,26] + t_pr[26,artificial] <= 206
- C2_Demand_27: t_pr[27,27] + t_pr[27,artificial] <= 208
+ C2_Demand_24: t_pr[24,24] + t_pr[24,artificial] + t_pr[24,25] <= 277
+ C2_Demand_25: t_pr[25,25] + t_pr[25,artificial] + t_pr[25,24]
+   + t_pr[25,26] + t_pr[25,27] <= 90
+ C2_Demand_26: t_pr[26,26] + t_pr[26,artificial] + t_pr[26,25] <= 206
+ C2_Demand_27: t_pr[27,27] + t_pr[27,artificial] + t_pr[27,25] <= 208
  C2_Demand_28: t_pr[28,28] + t_pr[28,artificial] <= 371
  C2_Demand_29: t_pr[29,29] + t_pr[29,artificial] <= 65
  C2_Demand_30: t_pr[30,30] + t_pr[30,artificial] <= 210
@@ -559,70 +569,17 @@ Subject To
  C3_NonNegativity_122_artificial: t_pr[122,artificial] >= 0
  C3_NonNegativity_123_artificial: t_pr[123,artificial] >= 0
  C3_NonNegativity_124_artificial: t_pr[124,artificial] >= 0
+ C3_NonNegativity_16_15: t_pr[16,15] >= 0
+ C3_NonNegativity_15_16: t_pr[15,16] >= 0
+ C3_NonNegativity_25_24: t_pr[25,24] >= 0
+ C3_NonNegativity_24_25: t_pr[24,25] >= 0
+ C3_NonNegativity_25_26: t_pr[25,26] >= 0
+ C3_NonNegativity_26_25: t_pr[26,25] >= 0
+ C3_NonNegativity_25_27: t_pr[25,27] >= 0
+ C3_NonNegativity_27_25: t_pr[27,25] >= 0
+ C3_NonNegativity_1_3: t_pr[1,3] >= 0
+ C3_NonNegativity_3_1: t_pr[3,1] >= 0
+ C3_NonNegativity_1_7: t_pr[1,7] >= 0
+ C3_NonNegativity_7_1: t_pr[7,1] >= 0
 Bounds
-Generals
- t_pr[0,0] t_pr[1,1] t_pr[2,2] t_pr[3,3] t_pr[4,4] t_pr[5,5] t_pr[6,6]
- t_pr[7,7] t_pr[8,8] t_pr[9,9] t_pr[10,10] t_pr[11,11] t_pr[12,12]
- t_pr[13,13] t_pr[14,14] t_pr[15,15] t_pr[16,16] t_pr[17,17] t_pr[18,18]
- t_pr[19,19] t_pr[20,20] t_pr[21,21] t_pr[22,22] t_pr[23,23] t_pr[24,24]
- t_pr[25,25] t_pr[26,26] t_pr[27,27] t_pr[28,28] t_pr[29,29] t_pr[30,30]
- t_pr[31,31] t_pr[32,32] t_pr[33,33] t_pr[34,34] t_pr[35,35] t_pr[36,36]
- t_pr[37,37] t_pr[38,38] t_pr[39,39] t_pr[40,40] t_pr[41,41] t_pr[42,42]
- t_pr[43,43] t_pr[44,44] t_pr[45,45] t_pr[46,46] t_pr[47,47] t_pr[48,48]
- t_pr[49,49] t_pr[50,50] t_pr[51,51] t_pr[52,52] t_pr[53,53] t_pr[54,54]
- t_pr[55,55] t_pr[56,56] t_pr[57,57] t_pr[58,58] t_pr[59,59] t_pr[60,60]
- t_pr[61,61] t_pr[62,62] t_pr[63,63] t_pr[64,64] t_pr[65,65] t_pr[66,66]
- t_pr[67,67] t_pr[68,68] t_pr[69,69] t_pr[70,70] t_pr[71,71] t_pr[72,72]
- t_pr[73,73] t_pr[74,74] t_pr[75,75] t_pr[76,76] t_pr[77,77] t_pr[78,78]
- t_pr[79,79] t_pr[80,80] t_pr[81,81] t_pr[82,82] t_pr[83,83] t_pr[84,84]
- t_pr[85,85] t_pr[86,86] t_pr[87,87] t_pr[88,88] t_pr[89,89] t_pr[90,90]
- t_pr[91,91] t_pr[92,92] t_pr[93,93] t_pr[94,94] t_pr[95,95] t_pr[96,96]
- t_pr[97,97] t_pr[98,98] t_pr[99,99] t_pr[100,100] t_pr[101,101]
- t_pr[102,102] t_pr[103,103] t_pr[104,104] t_pr[105,105] t_pr[106,106]
- t_pr[107,107] t_pr[108,108] t_pr[109,109] t_pr[110,110] t_pr[111,111]
- t_pr[112,112] t_pr[113,113] t_pr[114,114] t_pr[115,115] t_pr[116,116]
- t_pr[117,117] t_pr[118,118] t_pr[119,119] t_pr[120,120] t_pr[121,121]
- t_pr[122,122] t_pr[123,123] t_pr[124,124] t_pr[artificial,artificial]
- t_pr[0,artificial] t_pr[1,artificial] t_pr[2,artificial]
- t_pr[3,artificial] t_pr[4,artificial] t_pr[5,artificial]
- t_pr[6,artificial] t_pr[7,artificial] t_pr[8,artificial]
- t_pr[9,artificial] t_pr[10,artificial] t_pr[11,artificial]
- t_pr[12,artificial] t_pr[13,artificial] t_pr[14,artificial]
- t_pr[15,artificial] t_pr[16,artificial] t_pr[17,artificial]
- t_pr[18,artificial] t_pr[19,artificial] t_pr[20,artificial]
- t_pr[21,artificial] t_pr[22,artificial] t_pr[23,artificial]
- t_pr[24,artificial] t_pr[25,artificial] t_pr[26,artificial]
- t_pr[27,artificial] t_pr[28,artificial] t_pr[29,artificial]
- t_pr[30,artificial] t_pr[31,artificial] t_pr[32,artificial]
- t_pr[33,artificial] t_pr[34,artificial] t_pr[35,artificial]
- t_pr[36,artificial] t_pr[37,artificial] t_pr[38,artificial]
- t_pr[39,artificial] t_pr[40,artificial] t_pr[41,artificial]
- t_pr[42,artificial] t_pr[43,artificial] t_pr[44,artificial]
- t_pr[45,artificial] t_pr[46,artificial] t_pr[47,artificial]
- t_pr[48,artificial] t_pr[49,artificial] t_pr[50,artificial]
- t_pr[51,artificial] t_pr[52,artificial] t_pr[53,artificial]
- t_pr[54,artificial] t_pr[55,artificial] t_pr[56,artificial]
- t_pr[57,artificial] t_pr[58,artificial] t_pr[59,artificial]
- t_pr[60,artificial] t_pr[61,artificial] t_pr[62,artificial]
- t_pr[63,artificial] t_pr[64,artificial] t_pr[65,artificial]
- t_pr[66,artificial] t_pr[67,artificial] t_pr[68,artificial]
- t_pr[69,artificial] t_pr[70,artificial] t_pr[71,artificial]
- t_pr[72,artificial] t_pr[73,artificial] t_pr[74,artificial]
- t_pr[75,artificial] t_pr[76,artificial] t_pr[77,artificial]
- t_pr[78,artificial] t_pr[79,artificial] t_pr[80,artificial]
- t_pr[81,artificial] t_pr[82,artificial] t_pr[83,artificial]
- t_pr[84,artificial] t_pr[85,artificial] t_pr[86,artificial]
- t_pr[87,artificial] t_pr[88,artificial] t_pr[89,artificial]
- t_pr[90,artificial] t_pr[91,artificial] t_pr[92,artificial]
- t_pr[93,artificial] t_pr[94,artificial] t_pr[95,artificial]
- t_pr[96,artificial] t_pr[97,artificial] t_pr[98,artificial]
- t_pr[99,artificial] t_pr[100,artificial] t_pr[101,artificial]
- t_pr[102,artificial] t_pr[103,artificial] t_pr[104,artificial]
- t_pr[105,artificial] t_pr[106,artificial] t_pr[107,artificial]
- t_pr[108,artificial] t_pr[109,artificial] t_pr[110,artificial]
- t_pr[111,artificial] t_pr[112,artificial] t_pr[113,artificial]
- t_pr[114,artificial] t_pr[115,artificial] t_pr[116,artificial]
- t_pr[117,artificial] t_pr[118,artificial] t_pr[119,artificial]
- t_pr[120,artificial] t_pr[121,artificial] t_pr[122,artificial]
- t_pr[123,artificial] t_pr[124,artificial]
 End

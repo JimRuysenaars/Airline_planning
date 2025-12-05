@@ -124,12 +124,12 @@ B = create_RECAPTURE(path_recapture, P)
 
 # TODO: Pls fix
 PR0 = make_PR0_list(P)
-print(PR0)
+#print(PR0)
 
 
 # ---------- GUROBI MODEL ----------
 
-def solve_model(PR=PR0):
+def solve_model(PR):
 
     # ---------- GUROBI MODEL ----------
 
@@ -137,8 +137,9 @@ def solve_model(PR=PR0):
 
     # Decision variables: t_pr = pax originally from p, flown on r
     # Only create vars for recapture pairs listed in PR
-    t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.INTEGER)
-
+    t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.CONTINUOUS)
+    # print("PR: ", PR)
+    
     # ---------- Objective: max total revenue ----------
 
     # revenue = sum_{(p,r)} fare_r * t_pr
@@ -179,17 +180,29 @@ def solve_model(PR=PR0):
     sum = 0
     if model.status == gp.GRB.OPTIMAL:
         print(f"Optimal objective (revenue) = {model.objVal:.2f}")
-        print("\nNon-zero flows t_rp:")
-        for (p, r) in PR:
-            if t[p, r].X > 1e-6:
-                sum += t[p, r].X
-                print(f"t[{p},{r}] = {t[p,r].X:.2f}")
+        # print("\nNon-zero flows t_rp:")
+        # for (p, r) in PR:
+        #     if t[p, r].X > 1e-6:
+        #         sum += t[p, r].X
+        #         print(f"t[{p},{r}] = {t[p,r].X:.2f}")
 
-    model.write("model_part2.lp")  
+    # ---------- Return dual variables ----------
+    duals = {"pi": {}, "sigma": {}}
+    for constr in model.getConstrs():
+        name = constr.ConstrName
+        if name.startswith("C1_Capacity_"):
+            i = name[len("C1_Capacity_"):]
+            duals["pi"][i] = constr.Pi
+        elif name.startswith("C2_Demand_"):
+            p = name[len("C2_Demand_"):]
+            duals["sigma"][p] = constr.Pi
+
+    model.write("model_part2.lp")
+
+    return duals
 
 
-solve_model()
-
+# print(solve_model(PR0))
 
 """
 TODO: don't forget to check that the initial PR given to the solve_model function includes the artificial itineraties
@@ -198,13 +211,14 @@ TODO: don't forget to check that the initial PR given to the solve_model functio
 TODO: Finish the solve_model function by havin it return dual values in correct format
 """
 
-
 # ---------- Loop generating columns ----------
-print(solve_model(PR0))
+
 
 columns = PR0.copy()
-running = False
+running = True
 iteration = 0
+with open("column_generation_log.txt", "a") as f:
+    f.write(f"===== New Run =====\n")
 
 while running:
     iteration += 1
@@ -224,11 +238,36 @@ while running:
         
         B.loc[(p, r), "reduced_cost"] = reduced_cost
     # select new columns with the most negative reduced cost
-    pr_min_red_cost = B["reduced_cost"].idxmin()
+
+    reduced_costs = [
+    {'pair': (p, r), 'reduced_cost': B.loc[(p, r), 'reduced_cost']}
+    for (p, r), b_pr in B['b_pr'].items()
+    if b_pr != 0]
+    
+    value = [item['reduced_cost'] for item in reduced_costs if item['pair'] == ('15', '16')]
+    print("Reduced cost:", value)
+
+    reduced_costs = sorted(reduced_costs, key=lambda x: x['reduced_cost'])
+    print("Reduced costs: ", reduced_costs[0:6])
+    pr_min_red_cost = reduced_costs[0]['pair']      # ('p','r') with lowest reduced cost
+    pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
+
 
     # Add selected columns to columns
-    columns.append(pr_min_red_cost)
+    searching = True
+    while searching:
+        if pr_min_red_cost not in columns:
+            columns.extend([pr_min_red_cost, pr_min_red_cost_reverse])
+            searching = False
 
+        else:
+            print(f"Pair not selected: {pr_min_red_cost} already in columns. Searching for next best.")
+            reduced_costs.pop(0)
+            pr_min_red_cost = reduced_costs[0]['pair']
+            pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
+
+            
+        
     # Print info
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
 
@@ -236,9 +275,9 @@ while running:
     with open("column_generation_log.txt", "a") as f:
         f.write(f"Iteration: {iteration}\t"
                 f"Selected column: {pr_min_red_cost}\t"
-                f"Reduced cost: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
-                f"New columns: {columns}\t"
-                f"Duals: {duals}\t"
+                f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
+                f"Columns for next iteration: {columns}\t"
+                # f"Duals: {duals}\t"
                 f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
 
     # Check stopping criteria
