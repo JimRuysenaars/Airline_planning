@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import gurobipy as gp
 import itertools
+import time
 
 
 path_flights = 'Problem 2 - Data/flights.xlsx'
@@ -122,6 +123,7 @@ FL = create_FLIGHTS(path_flights)
 L = FL.index.tolist()       # flights i
 IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
 P = IT.index.tolist()       # itineraries p
+R = list(P) + ["artificial"]
 Qi = create_Q(DEL, IT)
 
 # Recapture pairs (p, r)
@@ -137,19 +139,14 @@ PR0 = make_PR0_list(P)
 def solve_model(PR):
 
     # ---------- GUROBI MODEL ----------
-
     model = gp.Model("Passenger_Mix_Flow")
-
     # Decision variables: t_pr = pax originally from p, flown on r
     # Only create vars for recapture pairs listed in PR
     t = model.addVars(PR, name="t_pr", lb=0.0, vtype=gp.GRB.CONTINUOUS)
-    # print("PR: ", PR)
     
-    # ---------- Objective: max total revenue ----------
-
-    # revenue = sum_{(p,r)} fare_r * t_pr
+    # Objective
     lost_revenue = gp.quicksum(
-        (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]']) * t[p, r]
+        (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]']) * t[p,r]
         for (p, r) in PR
     )
 
@@ -161,7 +158,7 @@ def solve_model(PR):
     for i in L:
         model.addConstr(
             gp.quicksum(
-                DEL.loc[p, i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR if r != 'artificial')
+                DEL.loc[p,i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR if r != 'artificial')
                 >= Qi.loc[i, "Q"] - FL.loc[i, 'Capacity'],
             name=f"C1_Capacity_{i}"
         )
@@ -181,30 +178,42 @@ def solve_model(PR):
         )
 
     # ---------- Optimize model ----------
+
+    t0 = time.perf_counter()
     model.optimize()
-    sum = 0
+    t1 = time.perf_counter()
+
+    result = {
+        "status": model.status,
+        "runtime": t1 - t0,
+        "obj": None,
+        "duals": {"pi": {}, "sigma": {}},
+        "t_values": {}
+    }
+
+
     if model.status == gp.GRB.OPTIMAL:
-        print(f"Optimal objective (revenue) = {model.objVal:.2f}")
-        # print("\nNon-zero flows t_rp:")
-        # for (p, r) in PR:
-        #     if t[p, r].X > 1e-6:
-        #         sum += t[p, r].X
-        #         print(f"t[{p},{r}] = {t[p,r].X:.2f}")
+        result["obj"] = model.objVal
+        # capture decision variable values (only for created PR)
+        for (p, r) in PR:
+            # Gurobi returns .X for var
+            val = t[p, r].X if t[p, r] is not None else 0.0
+            result["t_values"][(p, r)] = float(val)
 
     # ---------- Return dual variables ----------
-    duals = {"pi": {}, "sigma": {}}
     for constr in model.getConstrs():
         name = constr.ConstrName
         if name.startswith("C1_Capacity_"):
             i = name[len("C1_Capacity_"):]
-            duals["pi"][i] = constr.Pi
+            result["duals"]["pi"][i] = constr.Pi
         elif name.startswith("C2_Demand_"):
             p = name[len("C2_Demand_"):]
-            duals["sigma"][p] = constr.Pi
+            result["duals"]["sigma"][p] = constr.Pi
 
+    # optional: write the lp for debugging
     model.write("model_part2.lp")
 
-    return duals
+    return result
 
 
 
@@ -215,47 +224,49 @@ TODO: don't forget to check that the initial PR given to the solve_model functio
         -> using the function written for it: extend_DV nogwat
 
 TODO: Finish the solve_model function by havin it return dual values in correct format
+
+TODO: Check that all variablies are t(p,r) where p is the low!! and r the high in notation in the slides
+
+
 """
 
 # ---------- Loop generating columns ----------
 
-history = []
 columns = PR0.copy()
-running = True
+initial_column_count = len(columns)
 iteration = 0
+
+start_total = time.perf_counter()
+
 with open("column_generation_log.txt", "a") as f:
     f.write(f"===== New Run =====\n")
 
+running = True
 while running:
     iteration += 1
     # solve function that solves model with given columns
-    duals = solve_model(columns)
+    res = solve_model(columns)
+    duals = res["duals"]
 
     # calculate reduced costs based on duals
     for (p, r), b_pr in B['b_pr'].items():
         if b_pr == 0:
             continue
 
-        reduced_cost = (sum( (DEL.loc[p, i] - DEL.loc[r, i] * B.loc[(p, r), "b_pr"])  *  duals["pi"][i] 
+        reduced_cost = (sum( (DEL.loc[p, i] - DEL.loc[r,i] * B.loc[(p, r), "b_pr"])  *  duals["pi"][i] 
                             for i in L) 
         + duals["sigma"][p] 
-        - (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]'] )
-        )
+        - (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]'] ))
         
         B.loc[(p, r), "reduced_cost"] = reduced_cost
+    
     # select new columns with the most negative reduced cost
-
     reduced_costs = [
     {'pair': (p, r), 'reduced_cost': B.loc[(p, r), 'reduced_cost']}
     for (p, r), b_pr in B['b_pr'].items()
     if b_pr != 0]
     
-
-    value = [item['reduced_cost'] for item in reduced_costs if item['pair'] == ('15', '16')]
-    print("Reduced cost:", value)
-
     reduced_costs = sorted(reduced_costs, key=lambda x: x['reduced_cost'])
-    print("Reduced costs: ", reduced_costs[0:6])
     pr_min_red_cost = reduced_costs[0]['pair']      # ('p','r') with lowest reduced cost
     pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
 
@@ -273,15 +284,7 @@ while running:
             pr_min_red_cost = reduced_costs[0]['pair']
             pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
 
-
-    history.append({
-        "iteration": iteration,
-        "columns_in_model": list(columns),
-        "reduced_costs": { (p,r): B.loc[(p,r),"reduced_cost"] for (p,r) in B.index },
-        "chosen_column": pr_min_red_cost,
-        "chosen_column_reverse": pr_min_red_cost_reverse,
-    })      
-        
+   
     # Print info
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
 
@@ -290,7 +293,7 @@ while running:
         f.write(f"Iteration: {iteration}\t"
                 f"Selected column: {pr_min_red_cost}\t"
                 f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
-                f"Columns for next iteration: {columns}\t"
+                # f"Columns for next iteration: {columns}\t"
                 # f"Duals: {duals}\t"
                 f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
 
@@ -299,8 +302,83 @@ while running:
         running = False
 
 
-df_history = pd.DataFrame(history)
-df_history.to_excel("cg_iterations.xlsx", index=False)
+end_total = time.perf_counter()
+total_runtime = end_total - start_total
+
+# final solve to get final t_values & duals (ensure final RMP optimal)
+final_res = solve_model(columns)
+
+# compute total spilled passengers:
+t_vals = final_res["t_values"]
+total_spilled = 0.0
+for p in P:
+    flown = sum(t_vals.get((p, r), 0.0) for r in P if (p, r) in t_vals)
+    spilled = max(0.0, IT.loc[p, 'Demand'] - flown)
+    total_spilled += spilled
+
+# prepare concise outputs
+initial_cols = initial_column_count
+final_cols = len(columns)
+iterations = iteration
+optimal_obj = final_res["obj"]
+# first 5 itineraries (show t for all r)
+first5_itins = P[:]
+first5_t = {p: {r: t_vals.get((p, r), 0.0) for r in P if (p, r) in t_vals} for p in first5_itins}
+# first 5 flights duals
+first5_flights = L[:5]
+first5_duals = {i: final_res["duals"]["pi"].get(i, 0.0) for i in first5_flights}
+
+# print summary
+print("\n===== FINAL SUMMARY =====")
+print(f"Optimal objective (airline cost) = {optimal_obj:.2f}")
+print(f"Total passengers spilled = {total_spilled:.2f}")
+print(f"Number of columns (RMP) before = {initial_cols}, after = {final_cols}")
+print(f"Number of iterations = {iterations}")
+print(f"Total column-generation runtime (s) = {total_runtime:.2f}")
+print("\nDecision variables for first 5 itineraries:")
+for p, d in first5_t.items():
+    print(f" Itinerary {p}:")
+    for r, val in d.items():
+        print(f"   t[{p},{r}] = {val:.2f}")
+
+print("\nDuals (pi) for first 5 flights:")
+for i, val in first5_duals.items():
+    print(f" Flight {i}: pi = {val:.4f}")
 
 
+summary = {
+    "optimal_obj": optimal_obj,
+    "total_spilled": total_spilled,
+    "initial_columns": initial_cols,
+    "final_columns": final_cols,
+    "iterations": iterations,
+    "total_runtime_s": total_runtime,
+    "first5_itineraries_t": first5_t,
+    "first5_flights_duals": first5_duals
+}
 
+import json
+with open("cg_summary.json", "w") as f:
+    json.dump(summary, f, indent=2)
+
+
+import pandas as pd
+
+def export_nonzero_t_to_excel(model, filename="nonzero_t.xlsx"):
+    rows = []
+
+    for var in model.getVars():
+        if var.X > 1e-9 and var.VarName.startswith("t["):
+            # Extract (p, r) from t[p,r]
+            name = var.VarName.replace("t[", "").replace("]", "")
+            p, r = name.split(",")
+
+            rows.append({
+                "Itinerary p": p,
+                "Column r": r,
+                "Value t[p,r]": var.X
+            })
+
+    df = pd.DataFrame(rows)
+    df.to_excel(filename, index=False)
+    print(f"\nExcel file written: {filename}")
