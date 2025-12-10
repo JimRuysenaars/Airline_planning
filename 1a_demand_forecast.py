@@ -162,6 +162,16 @@ def future_demand_forecast(k, beta_1, beta_2, beta_3, pop_GDP_data, distances):
         else:
             future_demand_matrix.loc[i, j] = int(0)
 
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(future_demand_matrix.round().astype(int),
+            annot=True, fmt='d', cmap='Greens',
+            cbar_kws={"label": "Demand"})
+    plt.title("Future Demand Matrix 2026")
+    plt.xlabel("Destination Airport")
+    plt.ylabel("Origin Airport")
+    plt.tight_layout()
+    plt.show()
+
     return future_demand_matrix
 
 
@@ -216,6 +226,8 @@ def compare_demand_matrices(observed_demand, predicted_demand):
 
 
     return None
+
+
 
 def __main__():
     """
