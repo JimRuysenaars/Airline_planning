@@ -3,6 +3,8 @@ import numpy as np
 import gurobipy as gp
 import itertools
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 path_flights = 'Problem 2 - Data/flights.xlsx'
@@ -215,10 +217,6 @@ def solve_model(PR):
 
     return result
 
-
-
-# print(solve_model(make_PR_total_list(P)))
-
 """
 TODO: don't forget to check that the initial PR given to the solve_model function includes the artificial itineraties
         -> using the function written for it: extend_DV nogwat
@@ -241,7 +239,7 @@ start_total = time.perf_counter()
 with open("column_generation_log.txt", "a") as f:
     f.write(f"===== New Run =====\n")
 
-running = True
+running = False
 while running:
     iteration += 1
     # solve function that solves model with given columns
@@ -295,7 +293,8 @@ while running:
                 f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
                 # f"Columns for next iteration: {columns}\t"
                 # f"Duals: {duals}\t"
-                f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
+                f"reduced_costs: {B['reduced_cost'].to_dict()}\t"
+                f"")
 
     # Check stopping criteria
     if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
@@ -336,10 +335,10 @@ print(f"Number of columns (RMP) before = {initial_cols}, after = {final_cols}")
 print(f"Number of iterations = {iterations}")
 print(f"Total column-generation runtime (s) = {total_runtime:.2f}")
 print("\nDecision variables for first 5 itineraries:")
-for p, d in first5_t.items():
-    print(f" Itinerary {p}:")
-    for r, val in d.items():
-        print(f"   t[{p},{r}] = {val:.2f}")
+# for p, d in first5_t.items():
+#     print(f" Itinerary {p}:")
+#     for r, val in d.items():
+#         print(f"   t[{p},{r}] = {val:.2f}")
 
 print("\nDuals (pi) for first 5 flights:")
 for i, val in first5_duals.items():
@@ -362,23 +361,96 @@ with open("cg_summary.json", "w") as f:
     json.dump(summary, f, indent=2)
 
 
-import pandas as pd
 
-def export_nonzero_t_to_excel(model, filename="nonzero_t.xlsx"):
-    rows = []
 
-    for var in model.getVars():
-        if var.X > 1e-9 and var.VarName.startswith("t["):
-            # Extract (p, r) from t[p,r]
-            name = var.VarName.replace("t[", "").replace("]", "")
-            p, r = name.split(",")
+def heatmap_t_values(t_values, P):
+    # Create a 2D array for heatmap
+    heatmap_data = np.zeros((len(P), len(P)))
 
-            rows.append({
-                "Itinerary p": p,
-                "Column r": r,
-                "Value t[p,r]": var.X
-            })
+    p_index = {p: idx for idx, p in enumerate(P)}
+    r_index = {r: idx for idx, r in enumerate(P)}
 
-    df = pd.DataFrame(rows)
-    df.to_excel(filename, index=False)
-    print(f"\nExcel file written: {filename}")
+    for (p, r), val in t_values.items():
+        heatmap_data[p_index[p], r_index[r]] = val
+
+
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(heatmap_data, xticklabels=P, yticklabels=P, cmap="RdYlGn_r")
+    plt.xlabel("Itinerary r")
+    plt.ylabel("Itinerary p")
+    plt.title("Heatmap of t[p,r] values")
+    plt.show()
+
+flight_info = {flight_number : {"demand": 0, "capacity" : 0} for flight_number in FL.index}
+
+for itinerary in DEL.index:
+    for flight in DEL.columns:
+        if DEL.loc[itinerary, flight] == 1:
+            flight_info[flight]["demand"] += IT.loc[itinerary, "Demand"].item()
+            flight_info[flight]["capacity"] = FL.loc[flight, "Capacity"].item()
+
+
+def plot_spilled_passengers_heatmap(FL, flight_info):
+    """
+    Heatmap:
+      - y-axis: origin of a flight with flight number in parentheses
+      - x-axis: destination airport
+      - color: number of spilled passengers on that flight
+               (demand - capacity, floored at 0)
+    """
+    # Adjust these if your column names are different
+    origin_col = "Origin"
+    destination_col = "Destination"
+
+    # Unique destinations for x-axis
+    destinations = FL[destination_col].unique().tolist()
+
+    # Flights for y-axis
+    flights = FL.index.tolist()
+
+    # Matrix: rows = flights, cols = destinations
+    heatmap_data = np.zeros((len(flights), len(destinations)))
+
+    for row_idx, flight in enumerate(flights):
+        origin = FL.loc[flight, origin_col]
+        dest = FL.loc[flight, destination_col]
+
+        # spilled passengers = max(demand - capacity, 0)
+        demand = flight_info[flight]["demand"]
+        capacity = flight_info[flight]["capacity"]
+        spilled = demand - capacity
+
+        # place in matrix at (flight row, destination column)
+        col_idx = destinations.index(dest)
+        heatmap_data[row_idx, col_idx] = spilled
+
+    # Build y-tick labels: "Origin (FlightNo)"
+    yticklabels = [f"{FL.loc[f, origin_col]} ({f})" for f in flights]
+    yticklabels = [f"{f}" for f in flights]
+
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(
+        heatmap_data.transpose(),  # transpose for correct orientation
+        annot=False,
+        xticklabels=yticklabels,
+        yticklabels=destinations,
+        cmap = "Reds"
+    )
+    plt.xticks(fontsize=8)
+
+    plt.ylabel("Origin (Flight number)")
+    plt.title("Spilled passengers per flight (demand - capacity)")
+    plt.tight_layout()
+    ax = plt.gca()
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top')
+    sns.set(font_scale=0.1)
+    plt.yticks(rotation=0)      # horizontal labels
+    plt.xticks(rotation=45)     # angled columns
+    plt.xlabel("Destination")
+    plt.show()
+
+plot_spilled_passengers_heatmap(FL, flight_info)
+
+
