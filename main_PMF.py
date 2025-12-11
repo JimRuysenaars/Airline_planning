@@ -81,7 +81,7 @@ def create_RECAPTURE(path, P):
 
     for p, r in itertools.product(P, P):
         if p == r:
-            B.loc[(p, r), 'b_pr'] = 1.0  # ensure b_pp = 1
+            B.loc[(p, r), 'b_pr'] = 0.0  # ensure b_pp = 0 -> can't transfer from itinerary 1 to 1
         # artificial → r recapture allowed with rate 1.0
     for r in P:
         B.loc[("artificial", r), "b_pr"] = 1.0
@@ -114,9 +114,9 @@ def create_Q(DEL, IT):
     return Q
 
 def make_PR0_list(P):
-    PR = [(p, p) for p in P]
-    PR += [(p, "artificial") for p in P]
-    PR += [("artificial", p) for p in P]
+    # PR = [(p, p) for p in P]
+    PR = [(p, "artificial") for p in P]
+    #PR += [("artificial", p) for p in P]
     PR0 = list(dict.fromkeys(PR))
     return PR0
 
@@ -166,7 +166,7 @@ def solve_model(PR):
     for i in L:
         model.addConstr(
             gp.quicksum(
-                DEL.loc[p,i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR)
+                DEL.loc[p,i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR if r != 'artificial')
                 >= Qi.loc[i, "Q"] - FL.loc[i, 'Capacity'],
             name=f"C1_Capacity_{i}"
         )
@@ -246,7 +246,7 @@ start_total = time.perf_counter()
 with open("column_generation_log.txt", "a") as f:
     f.write(f"===== New Run =====\n")
 
-running = False
+running = True
 while running:
     iteration += 1
     # solve function that solves model with given columns
@@ -341,10 +341,10 @@ print(f"Number of columns (RMP) before = {initial_cols}, after = {final_cols}")
 print(f"Number of iterations = {iterations}")
 print(f"Total column-generation runtime (s) = {total_runtime:.2f}")
 print("\nDecision variables for first 5 itineraries:")
-# for p, d in first5_t.items():
-#     print(f" Itinerary {p}:")
-#     for r, val in d.items():
-#         print(f"   t[{p},{r}] = {val:.2f}")
+for p, d in first5_t.items():
+    print(f" Itinerary {p}:")
+    for r, val in d.items():
+        print(f"   t[{p},{r}] = {val:.2f}")
 
 print("\nDuals (pi) for first 5 flights:")
 for i, val in first5_duals.items():
