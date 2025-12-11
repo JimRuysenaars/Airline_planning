@@ -3,6 +3,8 @@ import numpy as np
 import gurobipy as gp
 import itertools
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 path_flights = 'Problem 2 - Data/flights.xlsx'
@@ -78,6 +80,10 @@ def create_RECAPTURE(path, P):
     for p, r in itertools.product(P, P):
         if p == r:
             B.loc[(p, r), 'b_pr'] = 1.0  # ensure b_pp = 1
+        # artificial → r recapture allowed with rate 1.0
+    for r in P:
+        B.loc[("artificial", r), "b_pr"] = 1.0
+
 
     B['b_pr'] = B['b_pr'].fillna(0.0)   # only for b_pr, leave reduced_cost NaN
 
@@ -108,6 +114,7 @@ def create_Q(DEL, IT):
 def make_PR0_list(P):
     PR = [(p, p) for p in P]
     PR += [(p, "artificial") for p in P]
+    PR += [("artificial", p) for p in P]
     PR0 = list(dict.fromkeys(PR))
     return PR0
 
@@ -131,7 +138,6 @@ B = create_RECAPTURE(path_recapture, P)
 
 # TODO: Pls fix
 PR0 = make_PR0_list(P)
-#print(PR0)
 
 
 # ---------- GUROBI MODEL ----------
@@ -158,7 +164,7 @@ def solve_model(PR):
     for i in L:
         model.addConstr(
             gp.quicksum(
-                DEL.loc[p,i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR if r != 'artificial')
+                DEL.loc[p,i] * t[p, r] for (p, r) in PR) - gp.quicksum(DEL.loc[p, i] * B.loc[(r, p), "b_pr"] * t[r, p] for (p, r) in PR)
                 >= Qi.loc[i, "Q"] - FL.loc[i, 'Capacity'],
             name=f"C1_Capacity_{i}"
         )
@@ -194,6 +200,7 @@ def solve_model(PR):
 
     if model.status == gp.GRB.OPTIMAL:
         result["obj"] = model.objVal
+        model.write("model_part2.lp")
         # capture decision variable values (only for created PR)
         for (p, r) in PR:
             # Gurobi returns .X for var
@@ -225,8 +232,8 @@ TODO: don't forget to check that the initial PR given to the solve_model functio
 
 TODO: Finish the solve_model function by havin it return dual values in correct format
 
-TODO: Check that all variablies are t(p,r) where p is the low!! and r the high in notation in the slides
-
+TODO: Check that all variablies are t(p,r) where p is the low!! and r the high in notation in the slide
+                                    t(p,r) = t(low,high)
 
 """
 
@@ -279,7 +286,7 @@ while running:
             searching = False
 
         else:
-            print(f"Pair not selected: {pr_min_red_cost} already in columns. Searching for next best.")
+            # print(f"Pair not selected: {pr_min_red_cost} already in columns. Searching for next best.")
             reduced_costs.pop(0)
             pr_min_red_cost = reduced_costs[0]['pair']
             pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
@@ -289,13 +296,13 @@ while running:
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
 
     # Write to file
-    with open("column_generation_log.txt", "a") as f:
-        f.write(f"Iteration: {iteration}\t"
-                f"Selected column: {pr_min_red_cost}\t"
-                f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
-                # f"Columns for next iteration: {columns}\t"
-                # f"Duals: {duals}\t"
-                f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
+    # with open("column_generation_log.txt", "a") as f:
+    #     f.write(f"Iteration: {iteration}\t"
+    #             f"Selected column: {pr_min_red_cost}\t"
+    #             f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
+    #             # f"Columns for next iteration: {columns}\t"
+    #             # f"Duals: {duals}\t"
+    #             f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
 
     # Check stopping criteria
     if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
@@ -336,6 +343,7 @@ print(f"Number of columns (RMP) before = {initial_cols}, after = {final_cols}")
 print(f"Number of iterations = {iterations}")
 print(f"Total column-generation runtime (s) = {total_runtime:.2f}")
 print("\nDecision variables for first 5 itineraries:")
+
 for p, d in first5_t.items():
     print(f" Itinerary {p}:")
     for r, val in d.items():
@@ -361,8 +369,6 @@ import json
 with open("cg_summary.json", "w") as f:
     json.dump(summary, f, indent=2)
 
-
-import pandas as pd
 
 def export_nonzero_t_to_excel(model, filename="nonzero_t.xlsx"):
     rows = []
