@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import seaborn as sns
+import json
 
 
 path_flights = 'Problem 2 - Data/flights.xlsx'
@@ -225,10 +226,6 @@ def solve_model(PR):
     return result
 
 """
-TODO: don't forget to check that the initial PR given to the solve_model function includes the artificial itineraties
-        -> using the function written for it: extend_DV nogwat
-
-TODO: Finish the solve_model function by havin it return dual values in correct format
 
 TODO: Check that all variablies are t(p,r) where p is the low!! and r the high in notation in the slide
                                     t(p,r) = t(low,high)
@@ -246,12 +243,29 @@ start_total = time.perf_counter()
 with open("column_generation_log.txt", "a") as f:
     f.write(f"===== New Run =====\n")
 
-running = False
+obj_values = []
+recaptured_values = []
+iteration_numbers = []
+
+running = True
 while running:
     iteration += 1
     # solve function that solves model with given columns
     res = solve_model(columns)
     duals = res["duals"]
+
+    # Track iteration number
+    iteration_numbers.append(iteration)
+
+    # A. Save objective value
+    obj_values.append(res["obj"])
+
+    # B. Save recaptured artificial → real passengers
+    tvals = res["t_values"]
+    recaptured = sum(tvals.get(("artificial", p), 0.0) for p in P)
+    recaptured_values.append(recaptured)
+
+
 
     # calculate reduced costs based on duals
     for (p, r), b_pr in B['b_pr'].items():
@@ -326,9 +340,11 @@ initial_cols = initial_column_count
 final_cols = len(columns)
 iterations = iteration
 optimal_obj = final_res["obj"]
+
 # first 5 itineraries (show t for all r)
 first5_itins = P[:]
 first5_t = {p: {r: t_vals.get((p, r), 0.0) for r in P if (p, r) in t_vals} for p in first5_itins}
+
 # first 5 flights duals
 first5_flights = L[:5]
 first5_duals = {i: final_res["duals"]["pi"].get(i, 0.0) for i in first5_flights}
@@ -362,12 +378,8 @@ summary = {
     "first5_flights_duals": first5_duals
 }
 
-import json
-with open("cg_summary.json", "w") as f:
-    json.dump(summary, f, indent=2)
-
-
-
+# with open("cg_summary.json", "w") as f:
+#     json.dump(summary, f, indent=2)
 
 def heatmap_t_values(t_values, P):
     # Create a 2D array for heatmap
@@ -457,6 +469,24 @@ def plot_spilled_passengers_heatmap(FL, flight_info):
     plt.xlabel("Destination")
     plt.show()
 
-plot_spilled_passengers_heatmap(FL, flight_info)
 
+    plt.figure(figsize=(10, 8))
 
+# ---------------- Plot 1: Objective value ----------------
+plt.subplot(2, 1, 1)
+plt.plot(iteration_numbers, obj_values, marker='o')
+plt.title("Objective Function Value per Iteration")
+plt.xlabel("Iteration")
+plt.ylabel("Objective Value (Cost)")
+plt.grid(True)
+
+# ---------------- Plot 2: Recaptured Passengers ----------------
+plt.subplot(2, 1, 2)
+plt.plot(iteration_numbers, recaptured_values, marker='o')
+plt.title("Total Recaptured Passengers from Artificial → Real")
+plt.xlabel("Iteration")
+plt.ylabel("Passengers")
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
