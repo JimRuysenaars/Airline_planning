@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import seaborn as sns
-import json
 
 
 path_flights = 'Problem 2 - Data/flights.xlsx'
@@ -127,6 +126,13 @@ def make_PR_total_list(P):
     PR += [("artificial", r) for r in P]
     PR_total = list(dict.fromkeys(PR))
     return PR_total
+
+def save_x_values_to_excel(x_values, filename="x_values_final.xlsx"):
+    df = pd.DataFrame(
+        [(p, r, val) for (p, r), val in x_values.items()],
+        columns=["p", "r", "x_value"]
+    )
+    df.to_excel(filename, index=False)
 # ---------- BUILD DATAFRAMES ----------
 
 # Sets
@@ -142,6 +148,8 @@ B = create_RECAPTURE(path_recapture, P)
 
 # TODO: Add all columns (p,r) where p,r in P plus artificial ones
 PR0 = make_PR_total_list(P)
+
+start_total = time.perf_counter()
 
 
 # ---------- GUROBI MODEL ----------
@@ -197,11 +205,11 @@ def solve_model(PR):
 
     result = {
         "status": model.status,
-        "runtime": t1 - t0,
-        "obj": None,
+        "runtime_s": t1 - t0,
+        "num_columns": len(PR),  # number of decision variables (columns) in the model
+        "obj": model.objVal if model.status == gp.GRB.OPTIMAL else None,
         "x_values": {}
     }
-
 
     if model.status == gp.GRB.OPTIMAL:
         result["obj"] = model.objVal
@@ -218,8 +226,25 @@ def solve_model(PR):
     return result
 
 
+
 dictionary = solve_model(PR0)
 
-for key, value in dictionary["x_values"].items():
-    if abs(value) > 1e-9:   # handles floating point noise
-        print(key, value)
+end_total = time.perf_counter()
+total_runtime = end_total - start_total
+
+
+print(f"Status: {dictionary['status']}")
+print(f"Runtime (s): {dictionary['runtime_s']:.2f}")
+print(f"Total runtime (s): {total_runtime}")
+print(f"Number of columns in model: {dictionary['num_columns']}")
+print(f"Optimal objective: {dictionary['obj']:.2f}")
+
+
+save_x_values_to_excel(dictionary["x_values"])
+
+
+
+# for key, value in dictionary["x_values"].items():
+#     if abs(value) > 1e-9:   # handles floating point noise
+#         print(key, value)
+

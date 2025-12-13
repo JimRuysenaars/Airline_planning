@@ -298,7 +298,7 @@ while running:
             searching = False
 
         else:
-            # print(f"Pair not selected: {pr_min_red_cost} already in columns. Searching for next best.")
+            print(f"Pair not selected: {pr_min_red_cost} already in columns. Searching for next best.")
             reduced_costs.pop(0)
             pr_min_red_cost = reduced_costs[0]['pair']
             pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
@@ -308,13 +308,13 @@ while running:
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
 
     # Write to file
-    # with open("column_generation_log.txt", "a") as f:
-    #     f.write(f"Iteration: {iteration}\t"
-    #             f"Selected column: {pr_min_red_cost}\t"
-    #             f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
-    #             # f"Columns for next iteration: {columns}\t"
-    #             # f"Duals: {duals}\t"
-    #             f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
+    with open("column_generation_log.txt", "a") as f:
+        f.write(f"Iteration: {iteration}\t"
+                f"Selected column: {pr_min_red_cost}\t"
+                f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
+                # f"Columns for next iteration: {columns}\t"
+                # f"Duals: {duals}\t"
+                f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
 
     # Check stopping criteria
     if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
@@ -342,7 +342,7 @@ iterations = iteration
 optimal_obj = final_res["obj"]
 
 # first 5 itineraries (show t for all r)
-first5_itins = P[:]
+first5_itins = P[:5]
 first5_t = {p: {r: t_vals.get((p, r), 0.0) for r in P if (p, r) in t_vals} for p in first5_itins}
 
 # first 5 flights duals
@@ -378,8 +378,28 @@ summary = {
     "first5_flights_duals": first5_duals
 }
 
-# with open("cg_summary.json", "w") as f:
-#     json.dump(summary, f, indent=2)
+
+# Save model output to excel file
+
+# iter_df = pd.DataFrame({
+#     "iteration": iteration_numbers,
+#     "objective_value": obj_values,
+#     "recaptured_artificial": recaptured_values
+# })
+
+# iter_df.to_excel("column_generation_progress.xlsx", index=False)
+
+t_df = (
+    pd.DataFrame(
+        [(p, r, val) for (p, r), val in t_vals.items()],
+        columns=["p", "r", "t_value"]
+    )
+)
+
+t_df.to_excel("t_values_final.xlsx", index=False)
+print("Saved t_values to t_values_final.xlsx")
+
+
 
 def heatmap_t_values(t_values, P):
     # Create a 2D array for heatmap
@@ -470,23 +490,11 @@ def plot_spilled_passengers_heatmap(FL, flight_info):
     plt.show()
 
 
-    plt.figure(figsize=(10, 8))
-
-# ---------------- Plot 1: Objective value ----------------
-plt.subplot(2, 1, 1)
-plt.plot(iteration_numbers, obj_values, marker='o')
-plt.title("Objective Function Value per Iteration")
-plt.xlabel("Iteration")
-plt.ylabel("Objective Value (Cost)")
-plt.grid(True)
-
-# ---------------- Plot 2: Recaptured Passengers ----------------
-plt.subplot(2, 1, 2)
-plt.plot(iteration_numbers, recaptured_values, marker='o')
-plt.title("Total Recaptured Passengers from Artificial → Real")
-plt.xlabel("Iteration")
-plt.ylabel("Passengers")
-plt.grid(True)
-
-plt.tight_layout()
-plt.show()
+# #  Plot 1: Objective value 
+# plt.figure(figsize = (12,6))
+# plt.plot(iteration_numbers, obj_values, marker='o')
+# plt.title("Objective Function Value per Iteration")
+# plt.xlabel("Iteration")
+# plt.ylabel("Objective Value (Cost)")
+# plt.grid(True)
+# plt.show()
