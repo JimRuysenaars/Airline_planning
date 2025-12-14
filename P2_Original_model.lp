@@ -1,6 +1,6 @@
 \ Model Passenger_Mix_Flow_Original
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0xae82cfc8bd98fc7b
+\ Signature: 0xcbb301792b456197
 Maximize
   42 x_pr[0,0] + 65 x_pr[0,1] + 68 x_pr[0,2] + 43 x_pr[0,3] + 56 x_pr[0,4]
    + 42 x_pr[0,5] + 65 x_pr[0,6] + 42 x_pr[0,7] + 45 x_pr[0,8]
@@ -8868,49 +8868,7 @@ Subject To
  C2_Demand_122: x_pr[122,122] <= 3
  C2_Demand_123: x_pr[123,123] <= 12
  C2_Demand_124: x_pr[124,124] <= 31
- C2_Demand_artificial: x_pr[artificial,0] + x_pr[artificial,1]
-   + x_pr[artificial,2] + x_pr[artificial,3] + x_pr[artificial,4]
-   + x_pr[artificial,5] + x_pr[artificial,6] + x_pr[artificial,7]
-   + x_pr[artificial,8] + x_pr[artificial,9] + x_pr[artificial,10]
-   + x_pr[artificial,11] + x_pr[artificial,12] + x_pr[artificial,13]
-   + x_pr[artificial,14] + x_pr[artificial,15] + x_pr[artificial,16]
-   + x_pr[artificial,17] + x_pr[artificial,18] + x_pr[artificial,19]
-   + x_pr[artificial,20] + x_pr[artificial,21] + x_pr[artificial,22]
-   + x_pr[artificial,23] + x_pr[artificial,24] + x_pr[artificial,25]
-   + x_pr[artificial,26] + x_pr[artificial,27] + x_pr[artificial,28]
-   + x_pr[artificial,29] + x_pr[artificial,30] + x_pr[artificial,31]
-   + x_pr[artificial,32] + x_pr[artificial,33] + x_pr[artificial,34]
-   + x_pr[artificial,35] + x_pr[artificial,36] + x_pr[artificial,37]
-   + x_pr[artificial,38] + x_pr[artificial,39] + x_pr[artificial,40]
-   + x_pr[artificial,41] + x_pr[artificial,42] + x_pr[artificial,43]
-   + x_pr[artificial,44] + x_pr[artificial,45] + x_pr[artificial,46]
-   + x_pr[artificial,47] + x_pr[artificial,48] + x_pr[artificial,49]
-   + x_pr[artificial,50] + x_pr[artificial,51] + x_pr[artificial,52]
-   + x_pr[artificial,53] + x_pr[artificial,54] + x_pr[artificial,55]
-   + x_pr[artificial,56] + x_pr[artificial,57] + x_pr[artificial,58]
-   + x_pr[artificial,59] + x_pr[artificial,60] + x_pr[artificial,61]
-   + x_pr[artificial,62] + x_pr[artificial,63] + x_pr[artificial,64]
-   + x_pr[artificial,65] + x_pr[artificial,66] + x_pr[artificial,67]
-   + x_pr[artificial,68] + x_pr[artificial,69] + x_pr[artificial,70]
-   + x_pr[artificial,71] + x_pr[artificial,72] + x_pr[artificial,73]
-   + x_pr[artificial,74] + x_pr[artificial,75] + x_pr[artificial,76]
-   + x_pr[artificial,77] + x_pr[artificial,78] + x_pr[artificial,79]
-   + x_pr[artificial,80] + x_pr[artificial,81] + x_pr[artificial,82]
-   + x_pr[artificial,83] + x_pr[artificial,84] + x_pr[artificial,85]
-   + x_pr[artificial,86] + x_pr[artificial,87] + x_pr[artificial,88]
-   + x_pr[artificial,89] + x_pr[artificial,90] + x_pr[artificial,91]
-   + x_pr[artificial,92] + x_pr[artificial,93] + x_pr[artificial,94]
-   + x_pr[artificial,95] + x_pr[artificial,96] + x_pr[artificial,97]
-   + x_pr[artificial,98] + x_pr[artificial,99] + x_pr[artificial,100]
-   + x_pr[artificial,101] + x_pr[artificial,102] + x_pr[artificial,103]
-   + x_pr[artificial,104] + x_pr[artificial,105] + x_pr[artificial,106]
-   + x_pr[artificial,107] + x_pr[artificial,108] + x_pr[artificial,109]
-   + x_pr[artificial,110] + x_pr[artificial,111] + x_pr[artificial,112]
-   + x_pr[artificial,113] + x_pr[artificial,114] + x_pr[artificial,115]
-   + x_pr[artificial,116] + x_pr[artificial,117] + x_pr[artificial,118]
-   + x_pr[artificial,119] + x_pr[artificial,120] + x_pr[artificial,121]
-   + x_pr[artificial,122] + x_pr[artificial,123] + x_pr[artificial,124]
-   + x_pr[artificial,artificial] <= 0
+ C2_Demand_artificial: <= 0
  C3_NonNegativity_0_0: x_pr[0,0] >= 0
  C3_NonNegativity_0_1: x_pr[0,1] >= 0
  C3_NonNegativity_0_2: x_pr[0,2] >= 0

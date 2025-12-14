@@ -184,10 +184,11 @@ def solve_model(PR):
     # C2: number of passengers is lower than the demand for each itinerary p
     for p in P:
         model.addConstr(
-            gp.quicksum(x[p, r] / B.loc[(p, r), "b_pr"] for r in P if (p, r) in PR if B.loc[(p, r), "b_pr"] != 0) <= IT.loc[p, 'Demand'],
+            gp.quicksum(x[p, r] / B.loc[(p, r), "b_pr"] for r in P if (p, r) in PR if B.loc[(p, r), "b_pr"] != 0 if p != "artificial") <= IT.loc[p, 'Demand'],
             name=f"C2_Demand_{p}"
         )
 
+    # if p != "artificial"
     # TODO : iterate in the constraint above over P_p and D_p
 
     # C3: number of passengers is positive

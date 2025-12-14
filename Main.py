@@ -52,6 +52,9 @@ import pandas as pd
 import itertools
 import gurobipy as gp
 import numpy as np
+from matplotlib.patches import FancyArrowPatch
+import geopandas as gpd
+from matplotlib.lines import Line2D
 
 def get_ICAO(path):
     df = pd.read_excel(path, header=None)
@@ -122,6 +125,26 @@ def build_distance_matrix(path):
         d_ij = d_ij * 6371  # Radius of Earth in kilometers
         D.iloc[i, j] = d_ij
     return D
+
+def ICAO_coordinates(path):
+    df = pd.read_excel(path, header=None)
+
+    # Row mapping based on sheet:
+    # 1: ICAO codes (column labels we want)
+    # 2: Latitude
+    # 3: Longitude
+
+    icao = df.iloc[1, 1:].tolist()
+    lat  = df.iloc[2, 1:].to_numpy(dtype=float)
+    lon  = df.iloc[3, 1:].to_numpy(dtype=float)
+
+    coordinates = pd.DataFrame(index=icao, columns=['latitude', 'longitude'], dtype=float)
+    for i in range(len(icao)):
+        coordinates.loc[icao[i], 'latitude'] = lat[i]
+        coordinates.loc[icao[i], 'longitude'] = lon[i]
+    return coordinates
+
+
 
 def create_OD(path_distance, path_demand):
     Distance_matrix = build_distance_matrix(path_distance)
@@ -332,6 +355,124 @@ model.write("model.lp")
 eps = 1e-12
 
 print("\n=== Binding / relevant constraints for non-zero z variables ===")
+
+z_values = {}
+for z in model.getVars():
+    if not z.VarName.startswith("z"):
+        continue
+    if abs(z.X) < eps:
+        continue   # skip z == 0
+
+
+
+    for constr in model.getConstrs():
+        coef = model.getCoeff(constr, z)
+        z_values[z.VarName] = z.X
+
+print(z_values)
+
+
+def make_map(z_values):
+    coordinates_df = ICAO_coordinates('Problem 1 - Data\\airport_data.xlsx')
+    import matplotlib.pyplot as plt
+    world = gpd.read_file('https://naciscdn.org/naturalearth/110m/cultural/ne_110m_admin_0_countries.zip')
+
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+    # Plot all airports
+    ax.scatter(coordinates_df['longitude'], coordinates_df['latitude'], 
+               color='black', s=30, zorder=5, label='Airports')
+
+
+        
+    oceans = gpd.read_file(
+    "https://naciscdn.org/naturalearth/110m/physical/ne_110m_ocean.zip"
+).to_crs("EPSG:4326")
+
+    # Load world map from Natural Earth data
+    # --- WATER ---
+    oceans.plot(
+        ax=ax,
+        color='lightblue',
+        edgecolor='none',
+        zorder=0
+    )
+
+    # --- LAND / COUNTRIES ---
+    world.plot(
+        ax=ax,
+        column= None,          # or 'has_airport' or None
+        color='#f7c97f',
+        edgecolor='black',
+        linewidth=0.5,
+        legend=True,
+        zorder=1
+    )
+
+
+    # Plot flight routes where z > 0.8
+    for z_var_name, z_value in z_values.items():
+        if z_value > 0.8:
+            # Parse z variable name: zijk[i,j,k]
+            parts = z_var_name.split('[')[1].rstrip(']').split(',')
+            airport_i = parts[0].strip()
+            airport_j = parts[1].strip()
+            
+            if airport_i in coordinates_df.index and airport_j in coordinates_df.index:
+                lon_i = coordinates_df.loc[airport_i, 'longitude']
+                lat_i = coordinates_df.loc[airport_i, 'latitude']
+                lon_j = coordinates_df.loc[airport_j, 'longitude']
+                lat_j = coordinates_df.loc[airport_j, 'latitude']
+                
+                # Extract aircraft type from z variable name
+                parts = z_var_name.split('[')[1].rstrip(']').split(',')
+                aircraft_type = parts[2].strip()
+                
+                # Define color map for aircraft types
+                color_map = {
+                    'AC1': 'indigo',
+                    'AC2': 'orange',
+                    'AC3': 'royalblue',
+                    'AC4': 'green'
+                }
+                
+                line_color = color_map.get(aircraft_type, 'gray')
+                
+                arrow = FancyArrowPatch((lon_i, lat_i), (lon_j, lat_j),
+                                        arrowstyle='-', mutation_scale=20, 
+                                        color=line_color, alpha=0.6, linewidth=3, zorder=4)
+                ax.add_patch(arrow)
+
+            # Add airport labels
+    for airport, row in coordinates_df.iterrows():
+        ax.annotate(airport, (row['longitude'], row['latitude']), 
+                    xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+        # Create legend for aircraft types
+        legend_elements = [Line2D([0], [0], color='indigo', lw=3, label='AC1'),
+                           Line2D([0], [0], color='orange', lw=3, label='AC2'),
+                           Line2D([0], [0], color='royalblue', lw=3, label='AC3'),
+                           Line2D([0], [0], color='green', lw=3, label='AC4')]
+        ax.legend(handles=legend_elements, loc='upper left')
+
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_title('Southern Star Airlines network map')
+        # Longitude (x-axis)
+    ax.set_xlim(-30, 35)
+
+    # Latitude (y-axis)
+    ax.set_ylim(30, 70)
+
+
+    # Plot the world map as background
+    world.boundary.plot(ax=ax, linewidth=1, color='black')
+
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+make_map(z_values)
 
 # for var in model.getVars():
 #     if not var.VarName.startswith("z"):
