@@ -55,6 +55,8 @@ import numpy as np
 from matplotlib.patches import FancyArrowPatch
 import geopandas as gpd
 from matplotlib.lines import Line2D
+import openpyxl
+
 
 def get_ICAO(path):
     df = pd.read_excel(path, header=None)
@@ -250,13 +252,14 @@ costs = gp.quicksum(
         AC.loc[k, "fixed_operating_cost"]
         + AC.loc[k, "time_cost_parameter"] * (OD.loc[(i, j), "distance"] / AC.loc[k, "speed"])
         + AC.loc[k, "fuel_cost_parameter"] * fuel_cost * OD.loc[(i, j), "distance"] / 1.5
-    )
+    ) * 0.7 
     for (i, j) in pairs
     for k in K
-)
+) + gp.quicksum(y[k] * AC.loc[k, "weekly_lease_cost"] for k in K)
 
 # Set objective
 model.setObjective(revenue - costs, gp.GRB.MAXIMIZE)
+model.setParam('MIPGap', 0.005)
 
 
 # Contstraints
@@ -471,6 +474,132 @@ def make_map(z_values):
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
+
+def write_schedule(z_values, filename="flight_schedule.xlsx"):
+    
+    # Parse z_values into structured data
+    schedule_data = []
+    for z_var_name, z_value in z_values.items():
+        parts = z_var_name.split('[')[1].rstrip(']').split(',')
+        airport_i = parts[0].strip()
+        airport_j = parts[1].strip()
+        aircraft_type = parts[2].strip()
+        
+        schedule_data.append({
+            'Origin': airport_i,
+            'Destination': airport_j,
+            'Aircraft': aircraft_type,
+            'Flights': z_value
+        })
+    
+    # Create DataFrame and write to Excel
+    df = pd.DataFrame(schedule_data)
+    df.to_excel(filename, index=False, sheet_name='Schedule')
+    
+    # Format Excel file
+    wb = openpyxl.load_workbook(filename)
+    ws = wb.active
+    
+
+    
+    wb.save(filename)
+
+def make_map_frequency(z_values):
+    linewidth = 3
+    coordinates_df = ICAO_coordinates('Problem 1 - Data\\airport_data.xlsx')
+    import matplotlib.pyplot as plt
+    world = gpd.read_file('https://naciscdn.org/naturalearth/110m/cultural/ne_110m_admin_0_countries.zip')
+
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+    # Plot all airports
+    ax.scatter(coordinates_df['longitude'], coordinates_df['latitude'], 
+               color='black', s=30, zorder=5, label='Airports')
+
+    oceans = gpd.read_file(
+    "https://naciscdn.org/naturalearth/110m/physical/ne_110m_ocean.zip"
+).to_crs("EPSG:4326")
+
+    # Load world map from Natural Earth data
+    # --- WATER ---
+    oceans.plot(
+        ax=ax,
+        color='lightblue',
+        edgecolor='none',
+        zorder=0
+    )
+
+    # --- LAND / COUNTRIES ---
+    world.plot(
+        ax=ax,
+        column= None,
+        color='#f7c97f',
+        edgecolor='black',
+        linewidth=0.5,
+        legend=True,
+        zorder=1
+    )
+
+    # Plot flight routes where z > 0.8, color by frequency
+    for z_var_name, z_value in z_values.items():
+        if z_value > 0.8:
+            parts = z_var_name.split('[')[1].rstrip(']').split(',')
+            airport_i = parts[0].strip()
+            airport_j = parts[1].strip()
+            
+            if airport_i in coordinates_df.index and airport_j in coordinates_df.index:
+                lon_i = coordinates_df.loc[airport_i, 'longitude']
+                lat_i = coordinates_df.loc[airport_i, 'latitude']
+                lon_j = coordinates_df.loc[airport_j, 'longitude']
+                lat_j = coordinates_df.loc[airport_j, 'latitude']
+                
+                # Color based on frequency (z_value)
+                if z_value <= 1.5:
+                    line_color = 'royalblue'
+                    linewidth = linewidth
+                elif z_value <= 2.5:
+                    line_color = 'darkgreen'
+                    linewidth = linewidth
+                elif z_value <= 3.5:
+                    line_color = 'violet'
+                    linewidth = linewidth
+                else:
+                    line_color = 'bisque'
+                    linewidth = linewidth
+                
+                arrow = FancyArrowPatch((lon_i, lat_i), (lon_j, lat_j),
+                                        arrowstyle='-', mutation_scale=20, 
+                                        color=line_color, alpha=0.6, linewidth=linewidth, zorder=4)
+                ax.add_patch(arrow)
+
+    # Add airport labels
+    for airport, row in coordinates_df.iterrows():
+        ax.annotate(airport, (row['longitude'], row['latitude']), 
+                    xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+    # Create legend for frequencies
+    legend_elements = [Line2D([0], [0], color='royalblue', lw=linewidth, label='1 time/week'),
+                       Line2D([0], [0], color='darkgreen', lw=linewidth, label='2 times/week'),
+                       Line2D([0], [0], color='violet', lw=linewidth, label='3 times/week'),
+                       Line2D([0], [0], color='bisque', lw=linewidth, label='4+ times/week')]
+    ax.legend(handles=legend_elements, loc='upper left')
+
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_title('Southern Star Airlines network map')
+    ax.set_xlim(-30, 35)
+    ax.set_ylim(30, 70)
+
+    world.boundary.plot(ax=ax, linewidth=1, color='black')
+
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+
+#write_schedule(z_values)
+
+make_map_frequency(z_values)
 
 make_map(z_values)
 
