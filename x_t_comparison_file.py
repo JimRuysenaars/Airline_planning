@@ -16,9 +16,10 @@ B = create_RECAPTURE(path_recapture, P)
 t_df = pd.read_excel("t_values_final.xlsx")
 
 t_values = {
-    (row["p"], row["r"]): row["t_value"]
+    (str(row["p"]), str(row["r"])): row["t_value"]
     for _, row in t_df.iterrows()
 }
+print(t_values)
 
 x_df = pd.read_excel("x_values_final.xlsx")
 
@@ -30,7 +31,13 @@ x_values = {
 
 to_excel = True
 
-
+# print(P)
+# for p in P:
+#     if p == 
+#     for r in P:
+#         t_value = t_values.get((p, r), 0.0)
+#         if t_value == 0.0:
+#             print(f"t_value for (p={p}, r={r}) is zero.")
 # Converting t_values to x_values
 rows = []
 for p in P:
