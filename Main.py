@@ -221,9 +221,9 @@ a_ijk = build_a_ijk(OD, AC)
 model = gp.Model("Airline_Planning")
 
 # Parameters
-fuel_cost = 1.42  # €/gallon
-utilization_time = 10 * 7   # 10 hours of operstions per day, 7 days a week -> 70 hours per week
-LF = 0.75  # Load factor
+fuel_cost = 1.42 * 1  # €/gallon
+utilization_time = 10 * 7 * 1.0 # 10 hours of operstions per day, 7 days a week -> 70 hours per week
+LF = 0.75 * 1.0 # Load factor
 
 
 # Create decision variables
@@ -259,7 +259,7 @@ costs = gp.quicksum(
 
 # Set objective
 model.setObjective(revenue - costs, gp.GRB.MAXIMIZE)
-model.setParam('MIPGap', 0.005)
+model.setParam('MIPGap', 0.008)  # 0.3% gap
 
 
 # Contstraints
@@ -366,13 +366,23 @@ for z in model.getVars():
     if abs(z.X) < eps:
         continue   # skip z == 0
 
-
-
     for constr in model.getConstrs():
         coef = model.getCoeff(constr, z)
         z_values[z.VarName] = z.X
 
-print(z_values)
+# # print the slack for each  constraint
+# for constr in model.getConstrs():
+#     print(f"{constr.ConstrName}: slack = {constr.Slack}")
+#     with open("constr_slacks.txt", "a") as f:
+#         f.write(f"{constr.ConstrName}: slack = {constr.Slack}\n")
+
+# for each OD pair, write the distance to an excel file
+    distances = {(i, j): OD.loc[(i, j), "distance"] for (i, j) in pairs}
+    with open("distances.txt", "a") as f:
+        for (i, j), distance in distances.items():
+            f.write(f"Distance from {i} to {j}: {distance}\n")
+
+#print(z_values)
 
 
 def make_map(z_values):
@@ -433,10 +443,10 @@ def make_map(z_values):
                 
                 # Define color map for aircraft types
                 color_map = {
-                    'AC1': 'indigo',
-                    'AC2': 'orange',
-                    'AC3': 'royalblue',
-                    'AC4': 'green'
+                    'AC1': 'navy',
+                    'AC2': 'darkgreen',
+                    'AC3': 'purple',
+                    'AC4': 'red'
                 }
                 
                 line_color = color_map.get(aircraft_type, 'gray')
@@ -452,19 +462,18 @@ def make_map(z_values):
                     xytext=(5, 5), textcoords='offset points', fontsize=8)
 
         # Create legend for aircraft types
-        legend_elements = [Line2D([0], [0], color='indigo', lw=3, label='AC1'),
-                           Line2D([0], [0], color='orange', lw=3, label='AC2'),
-                           Line2D([0], [0], color='royalblue', lw=3, label='AC3'),
-                           Line2D([0], [0], color='green', lw=3, label='AC4')]
+        legend_elements = [Line2D([0], [0], color='navy', lw=3, label='AC1'),
+                           Line2D([0], [0], color='darkgreen', lw=3, label='AC2'),
+                           Line2D([0], [0], color='purple', lw=3, label='AC3'),
+                           Line2D([0], [0], color='red', lw=3, label='AC4')]
         ax.legend(handles=legend_elements, loc='upper left')
 
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
-    ax.set_title('Southern Star Airlines network map')
+    ax.set_title('Southern Star Airlines aircraft type map')
         # Longitude (x-axis)
     ax.set_xlim(-30, 35)
-
-    # Latitude (y-axis)
+    ax.axis('off')  # Hide axes and labels# Latitude (y-axis)
     ax.set_ylim(30, 70)
 
 
@@ -552,19 +561,19 @@ def make_map_frequency(z_values):
                 lat_i = coordinates_df.loc[airport_i, 'latitude']
                 lon_j = coordinates_df.loc[airport_j, 'longitude']
                 lat_j = coordinates_df.loc[airport_j, 'latitude']
-                
+                color_map = {'AC1': 'midnightblue', 'AC2': 'darkgreen', 'AC3': 'purple', 'AC4': 'red'}
                 # Color based on frequency (z_value)
                 if z_value <= 1.5:
-                    line_color = 'royalblue'
+                    line_color = 'midnightblue'
                     linewidth = linewidth
                 elif z_value <= 2.5:
                     line_color = 'darkgreen'
                     linewidth = linewidth
                 elif z_value <= 3.5:
-                    line_color = 'violet'
+                    line_color = 'purple'
                     linewidth = linewidth
                 else:
-                    line_color = 'bisque'
+                    line_color = 'red'
                     linewidth = linewidth
                 
                 arrow = FancyArrowPatch((lon_i, lat_i), (lon_j, lat_j),
@@ -578,15 +587,16 @@ def make_map_frequency(z_values):
                     xytext=(5, 5), textcoords='offset points', fontsize=8)
 
     # Create legend for frequencies
-    legend_elements = [Line2D([0], [0], color='royalblue', lw=linewidth, label='1 time/week'),
+    legend_elements = [Line2D([0], [0], color='midnightblue', lw=linewidth, label='1 time/week'),
                        Line2D([0], [0], color='darkgreen', lw=linewidth, label='2 times/week'),
-                       Line2D([0], [0], color='violet', lw=linewidth, label='3 times/week'),
-                       Line2D([0], [0], color='bisque', lw=linewidth, label='4+ times/week')]
+                       Line2D([0], [0], color='purple', lw=linewidth, label='3 times/week'),
+                       Line2D([0], [0], color='red', lw=linewidth, label='4+ times/week')]
     ax.legend(handles=legend_elements, loc='upper left')
 
     ax.set_xlabel('Longitude')
     ax.set_ylabel('Latitude')
-    ax.set_title('Southern Star Airlines network map')
+    ax.set_title('Southern Star Airlines flight frequency map')
+    ax.axis('off')  # Hide axes and labels ax.set_title('Southern Star Airlines flight frequency map')
     ax.set_xlim(-30, 35)
     ax.set_ylim(30, 70)
 
@@ -596,12 +606,83 @@ def make_map_frequency(z_values):
     plt.tight_layout()
     plt.show()
 
+def plot_range_map():
+    coordinates_df = ICAO_coordinates('Problem 1 - Data\\airport_data.xlsx')
+    import matplotlib.pyplot as plt
+    world = gpd.read_file('https://naciscdn.org/naturalearth/110m/cultural/ne_110m_admin_0_countries.zip')
+
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+    # Plot all airports
+    ax.scatter(coordinates_df['longitude'], coordinates_df['latitude'], 
+               color='black', s=30, zorder=5, label='Airports')
+
+    oceans = gpd.read_file(
+    "https://naciscdn.org/naturalearth/110m/physical/ne_110m_ocean.zip"
+    ).to_crs("EPSG:4326")
+
+    # --- WATER ---
+    oceans.plot(
+        ax=ax,
+        color='lightblue',
+        edgecolor='none',
+        zorder=0
+    )
+
+    # --- LAND / COUNTRIES ---
+    world.plot(
+        ax=ax,
+        column=None,
+        color='#f7c97f',
+        edgecolor='black',
+        linewidth=0.5,
+        legend=True,
+        zorder=1
+    )
+
+    # Get LEMF coordinates
+    lemf_lon = coordinates_df.loc['LEMF', 'longitude']
+    lemf_lat = coordinates_df.loc['LEMF', 'latitude']
+
+    # Plot range circles for each aircraft
+    color_map = {'AC1': 'navy', 'AC2': 'darkgreen', 'AC3': 'purple', 'AC4': 'red'}
+
+    for aircraft in AC.index:
+        max_range_km = AC.loc[aircraft, 'maximum_range']
+        # Convert km to degrees (approximate: 1 degree ≈ 111 km)
+        max_range_deg = max_range_km / 111
+        
+
+        circle = plt.Circle((lemf_lon, lemf_lat), max_range_deg, 
+                           color=color_map.get(aircraft, 'gray'), 
+                           fill=False, linewidth=2, alpha=0.6, zorder=3,
+                           label=f'{aircraft} (range: {max_range_km:.0f}km)')
+        ax.add_patch(circle)
+
+    # Add airport labels
+    for airport, row in coordinates_df.iterrows():
+        ax.annotate(airport, (row['longitude'], row['latitude']), 
+                    xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_title('Aircraft Range from LEMF')
+    ax.set_xlim(-30, 35)
+    ax.set_ylim(30, 70)
+
+    world.boundary.plot(ax=ax, linewidth=1, color='black')
+    ax.legend(loc='upper left')
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
 
 #write_schedule(z_values)
 
-make_map_frequency(z_values)
+#plot_range_map()
 
-make_map(z_values)
+# make_map_frequency(z_values)
+
+# make_map(z_values)
 
 # for var in model.getVars():
 #     if not var.VarName.startswith("z"):
@@ -626,61 +707,4 @@ WHen increasing the yield for the madrid airport by a lot, more routes are serve
 WHen changing the 5.9 in the yield funtion to 200. THis is the result:
 Also add 70 hours operation constrain is a simplification.
 
-y[AC2]: 1.0
-y[AC3]: 4.0
-y[AC4]: 4.0
-zijk[BIKF,LEMF,AC3]: 2.0
-zijk[EDDF,LEMF,AC4]: 6.0
-zijk[EDDM,LEMF,AC2]: 1.0
-zijk[EDDM,LEMF,AC3]: 5.0
-zijk[EDDM,LEMF,AC4]: 4.0
-zijk[EDDT,LEMF,AC4]: 1.0
-zijk[EFHK,LEMF,AC3]: 1.0
-zijk[EFHK,LEMF,AC4]: 2.0
-zijk[EGLL,LEMF,AC3]: 5.0
-zijk[EGLL,LEMF,AC4]: 10.0
-zijk[EGPH,LEMF,AC3]: 2.0
-zijk[EHAM,LEMF,AC4]: 1.0
-zijk[EIDW,LEMF,AC4]: 3.0
-zijk[EPWA,LEMF,AC3]: 3.0
-zijk[ESSA,LEMF,AC4]: 3.0
-zijk[LEBL,LEMF,AC4]: 3.0
-zijk[LEMF,BIKF,AC3]: 2.0
-zijk[LEMF,EDDF,AC4]: 6.0
-zijk[LEMF,EDDM,AC2]: 1.0
-zijk[LEMF,EDDM,AC3]: 5.0
-zijk[LEMF,EDDM,AC4]: 4.0
-zijk[LEMF,EDDT,AC4]: 1.0
-zijk[LEMF,EFHK,AC3]: 1.0
-zijk[LEMF,EFHK,AC4]: 2.0
-zijk[LEMF,EGLL,AC3]: 5.0
-zijk[LEMF,EGLL,AC4]: 10.0
-zijk[LEMF,EGPH,AC3]: 2.0
-zijk[LEMF,EHAM,AC4]: 1.0
-zijk[LEMF,EIDW,AC4]: 3.0
-zijk[LEMF,EPWA,AC3]: 3.0
-zijk[LEMF,ESSA,AC4]: 3.0
-zijk[LEMF,LEBL,AC4]: 3.0
-zijk[LEMF,LFPG,AC3]: 1.0
-zijk[LEMF,LFPG,AC4]: 9.0
-zijk[LEMF,LGIR,AC2]: 1.0
-zijk[LEMF,LGIR,AC3]: 1.0
-zijk[LEMF,LICJ,AC3]: 3.0
-zijk[LEMF,LIRF,AC3]: 8.0
-zijk[LEMF,LIRF,AC4]: 2.0
-zijk[LEMF,LPMA,AC3]: 2.0
-zijk[LEMF,LPPT,AC3]: 2.0
-zijk[LEMF,LPPT,AC4]: 1.0
-zijk[LEMF,LROP,AC3]: 3.0
-zijk[LFPG,LEMF,AC3]: 1.0
-zijk[LFPG,LEMF,AC4]: 9.0
-zijk[LGIR,LEMF,AC2]: 1.0
-zijk[LGIR,LEMF,AC3]: 1.0
-zijk[LICJ,LEMF,AC3]: 3.0
-zijk[LIRF,LEMF,AC3]: 8.0
-zijk[LIRF,LEMF,AC4]: 2.0
-zijk[LPMA,LEMF,AC3]: 2.0
-zijk[LPPT,LEMF,AC3]: 2.0
-zijk[LPPT,LEMF,AC4]: 1.0
-zijk[LROP,LEMF,AC3]: 3.0
 '''
