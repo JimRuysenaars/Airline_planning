@@ -113,17 +113,17 @@ def create_Q(DEL, IT):
 
     return Q
 
-def make_PR0_list(P):
-    PR = [(p, p) for p in P]
-    PR += [(p, "artificial") for p in P]
-    PR += [("artificial", p) for p in P]
-    PR0 = list(dict.fromkeys(PR))
-    return PR0
+# def make_PR0_list(P):
+#     PR = [(p, p) for p in P]
+#     PR += [(p, "artificial") for p in P]
+#     PR += [("artificial", p) for p in P]
+#     PR0 = list(dict.fromkeys(PR))
+#     return PR0
 
 def make_PR_total_list(P):
-    PR = [(p, r) for p in P for r in P]
+    PR = [(p, r) for p in P for r in P if B.loc[(p, r), "b_pr"] != 0]
     PR += [(p, "artificial") for p in P]
-    PR += [("artificial", r) for r in P]
+    # PR += [("artificial", r) for r in P]
     PR_total = list(dict.fromkeys(PR))
     return PR_total
 
@@ -133,6 +133,7 @@ def save_x_values_to_excel(x_values, filename="x_values_final.xlsx"):
         columns=["p", "r", "x_value"]
     )
     df.to_excel(filename, index=False)
+
 # ---------- BUILD DATAFRAMES ----------
 
 # Sets
@@ -148,6 +149,7 @@ B = create_RECAPTURE(path_recapture, P)
 
 # TODO: Add all columns (p,r) where p,r in P plus artificial ones
 PR0 = make_PR_total_list(P)
+print(PR0)
 
 start_total = time.perf_counter()
 
@@ -158,9 +160,7 @@ def solve_model(PR):
 
     # ---------- GUROBI MODEL ----------
     model = gp.Model("Passenger_Mix_Flow_Original")
-    # Decision variables: t_pr = pax originally from p, flown on r
-    # Only create vars for recapture pairs listed in PR
-    x = model.addVars(PR, name="x_pr", lb=0.0, vtype=gp.GRB.CONTINUOUS)
+    x = model.addVars(PR, name="x_pr", lb=0.0, vtype=gp.GRB.INTEGER)
     
     # Objective
     revenue = gp.quicksum(
@@ -184,12 +184,9 @@ def solve_model(PR):
     # C2: number of passengers is lower than the demand for each itinerary p
     for p in P:
         model.addConstr(
-            gp.quicksum(x[p, r] / B.loc[(p, r), "b_pr"] for r in P if (p, r) in PR if B.loc[(p, r), "b_pr"] != 0 if p != "artificial") <= IT.loc[p, 'Demand'],
+            gp.quicksum(x[p, r] / B.loc[(p, r), "b_pr"] for r in P if (p, r) in PR and r != 'artificial') <= IT.loc[p, 'Demand'],
             name=f"C2_Demand_{p}"
         )
-
-    # if p != "artificial"
-    # TODO : iterate in the constraint above over P_p and D_p
 
     # C3: number of passengers is positive
     for (p, r) in PR:
@@ -245,7 +242,7 @@ save_x_values_to_excel(dictionary["x_values"])
 
 
 
-# for key, value in dictionary["x_values"].items():
-#     if abs(value) > 1e-9:   # handles floating point noise
-#         print(key, value)
+for key, value in dictionary["x_values"].items():
+    if abs(value) > 1e-9:   # handles floating point noise
+        print(key, value)
 

@@ -1,6 +1,8 @@
 import pandas as pd
 from create_dataframes import create_RECAPTURE, create_ITINERARIES, create_FLIGHTS
 
+
+# ------------------ computing dataframes etc --------------------
 path_flights = 'Problem 2 - Data/flights.xlsx'
 path_itineraries = 'Problem 2 - Data/itineraries.xlsx'
 path_recapture = 'Problem 2 - Data/recapture.xlsx'
@@ -24,9 +26,9 @@ x_values = {
     (row["p"], row["r"]): row["x_value"]
     for _, row in x_df.iterrows()
 }
+# ------------------------------------------------------------------------------------------
 
-# print(t_values[("0", "artificial")])
-# print(x_values[("0", "1")])
+to_excel = True
 
 
 # Converting t_values to x_values
@@ -64,39 +66,40 @@ for p in P:
 
 x_df_computed = pd.DataFrame(rows)
 
-x_df.to_excel("x_values_computed.xlsx", index=False)
 
 
-# Objective values
-# Original revenue
+# Objective values:
+# From original X
 revenue_OG = 0
 for _, row in x_df.iterrows():
     p, r, x_val = row["p"], row["r"], row["x_value"]
     revenue_OG += IT.loc[r, "Price [EUR]"] * x_val
 
-# Computed revenue
+# From computed x from t
 revenue_computed = 0
 for _, row in x_df_computed.iterrows():
     p, r, x_val = row["p"], row["r"], row["x_value"]
     revenue_computed += IT.loc[r, "Price [EUR]"] * x_val
 
-# print(revenue_OG, revenue_computed)
+print(revenue_OG, revenue_computed)
 
-# Merge the original and computed x-values
+
+
+
+# Diference in x_values
 comparison_df = x_df.merge(
     x_df_computed,
     on=["p", "r"],
     how="outer",
     suffixes=("_orig", "_computed")
 )
-
-# Filter rows where the values are different (allowing for floating point tolerance)
 tolerance = 1e-6
 diff_df = comparison_df[
     (comparison_df["x_value_orig"] - comparison_df["x_value_computed"]).abs() > tolerance
 ]
 
-# Show the differences
-# print(diff_df)
 
-diff_df.to_excel("x_values_differences.xlsx", index=False)
+
+if to_excel == True:
+    x_df.to_excel("x_values_computed.xlsx", index=False)
+    diff_df.to_excel("x_values_differences.xlsx", index=False)

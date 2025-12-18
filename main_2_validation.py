@@ -10,9 +10,9 @@ import seaborn as sns
 import json
 
 
-path_flights = 'Problem 2 - Data/flights.xlsx'
-path_itineraries = 'Problem 2 - Data/itineraries.xlsx'
-path_recapture = 'Problem 2 - Data/recapture.xlsx'
+path_flights = 'Problem 2 - Data/flights_test.xlsx'
+path_itineraries = 'Problem 2 - Data/itineraries_test.xlsx'
+path_recapture = 'Problem 2 - Data/recapture_test.xlsx'
 
 # ---------- DATA READING FUNCTIONS ----------
 
@@ -50,10 +50,15 @@ def create_ITINERARIES(path, flights_index):
         f1 = df.loc[it, "Flight 1"]
         f2 = df.loc[it, "Flight 2"]
 
-        if isinstance(f1, str) and f1 in flights_index:
-            DEL.loc[it, f1] = 1
-        if isinstance(f2, str) and f2 in flights_index:
-            DEL.loc[it, f2] = 1
+        if not pd.isna(f1):
+            f1 = str(int(f1)) if isinstance(f1, (int, float)) else str(f1)
+            if f1 in flights_index:
+                DEL.loc[it, f1] = 1
+
+        if not pd.isna(f2):
+            f2 = str(int(f2)) if isinstance(f2, (int, float)) else str(f2)
+            if f2 in flights_index:
+                DEL.loc[it, f2] = 1
 
     return IT, DEL
 
@@ -97,6 +102,7 @@ def create_Q(DEL, IT):
     Q = pd.DataFrame(0.0, index=DEL.columns, columns=["Q"])
 
     # Loop over each flight (column of DEL)
+
     for flight in DEL.columns:
 
         total_demand = 0.0
@@ -106,11 +112,12 @@ def create_Q(DEL, IT):
 
             delta = DEL.loc[it, flight]      # 0 or 1
             demand = IT.loc[it, "Demand"]    # D_p
-
+            print(f"Flight {flight}, Itinerary {it}: δ = {delta}, Demand = {demand}")
             total_demand += delta * demand
 
         # Store in Q
         Q.loc[flight, "Q"] = total_demand
+        print(f"Flight {flight}: Total Demand Q = {total_demand}")
 
     return Q
 
@@ -131,6 +138,7 @@ def create_Q(DEL, IT):
 
 # Sets
 FL = create_FLIGHTS(path_flights)
+FL.index = FL.index.astype(str)
 L = FL.index.tolist()       # flights i
 IT, DEL = create_ITINERARIES(path_itineraries, flights_index=FL.index)
 P = IT.index.tolist()       # itineraries p
@@ -207,10 +215,10 @@ def solve_model(PR, integer=False):
         "t_values": {}
     }
 
-
+    model.write("model_part2_test.lp")
     if model.status == gp.GRB.OPTIMAL:
         result["obj"] = model.objVal
-        model.write("model_part2.lp")
+        # model.write("model_part2_test.lp")
         # capture decision variable values (only for created PR)
         for (p, r) in PR:
             # Gurobi returns .X for var
@@ -232,11 +240,7 @@ def solve_model(PR, integer=False):
             result["duals"]["sigma"][p] = constr.Pi
             result.setdefault("slack", {})[name] = constr.Slack
 
-
-
-    # optional: write the lp for debugging
-    model.write("model_part2.lp")
-
+    print(result["duals"]["pi"])
     return result
 
 """
@@ -254,7 +258,7 @@ iteration = 0
 
 start_total = time.perf_counter()
 
-with open("column_generation_log.txt", "a") as f:
+with open("column_generation_log_test.txt", "a") as f:
     f.write(f"===== New Run =====\n")
 
 obj_values = []
@@ -281,7 +285,6 @@ while running:
     recaptured_values.append(recaptured)
 
 
-
     # calculate reduced costs based on duals
     for (p, r), b_pr in B['b_pr'].items():
         if b_pr == 0:
@@ -292,7 +295,7 @@ while running:
         + duals["sigma"][p] 
         - (IT.loc[p, 'Price [EUR]'] - B.loc[(p, r), "b_pr"] * IT.loc[r, 'Price [EUR]'] ))
         
-        B.loc[(p, r), "reduced_cost"] = - reduced_cost
+        B.loc[(p, r), "reduced_cost"] = -reduced_cost
     
     # select new columns with the most negative reduced cost
     reduced_costs = [
@@ -302,6 +305,7 @@ while running:
     
     reduced_costs = sorted(reduced_costs, key=lambda x: x['reduced_cost'])
     pr_min_red_cost = reduced_costs[0]['pair']      # ('p','r') with lowest reduced cost
+    print("Reduced costs sorted: ", reduced_costs)
     pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
 
 
@@ -316,22 +320,17 @@ while running:
         else:
             print(f"Pair not selected: {pr_min_red_cost} already in columns. Searching for next best.")
             reduced_costs.pop(0)
-            pr_min_red_cost = reduced_costs[0]['pair']
-            pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
+            if len(reduced_costs) == 0:
+                searching = False
+                break
+            else:
+                pr_min_red_cost = reduced_costs[0]['pair']
+                pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
 
-    print("Hier komt res: ", res["slack"])
+    #print("Hier komt res: ", res["slack"])
    
     # Print info
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
-
-    # # Write to file
-    # with open("column_generation_log.txt", "a") as f:
-    #     f.write(f"Iteration: {iteration}\t"
-    #             f"Selected column: {pr_min_red_cost}\t"
-    #             f"Reduced cost selected dec variable: {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}\t"
-    #             # f"Columns for next iteration: {columns}\t"
-    #             # f"Duals: {duals}\t"
-    #             f"reduced_costs: {B['reduced_cost'].to_dict()}\n")
 
     # Check stopping criteria
     if B.loc[pr_min_red_cost, "reduced_cost"] >= -0.001:
@@ -342,9 +341,9 @@ while running:
 
 end_total = time.perf_counter()
 total_runtime = end_total - start_total
-
+print(f"COLUMNS: {columns}")
 # final solve to get final t_values & duals (ensure final RMP optimal)
-final_res = solve_model(columns, integer=True)
+final_res = solve_model(columns, integer=False)
 
 # compute total spilled passengers:
 t_vals = final_res["t_values"]
@@ -377,6 +376,7 @@ print(f"Number of iterations = {iterations}")
 print(f"Total column-generation runtime (s) = {total_runtime:.2f}")
 print("\nDecision variables for first 5 itineraries:")
 nonzero_t = [(p, r, v) for (p, r), v in t_vals.items() if abs(v) > 1e-9]
+# take first 5
 for p, r, v in nonzero_t[:5]:
     print(f"t[{p},{r}] = {v:.2f}")
 
@@ -384,6 +384,7 @@ print("\nDuals (pi) for first 5 flights:")
 nonzero_duals = [(i, v) for i, v in final_res["duals"]["pi"].items() if abs(v) > 1e-9]
 for i, v in nonzero_duals[:5]:
     print(f"Flight {i}: pi = {v:.4f}")
+
 
 
 summary = {
@@ -398,15 +399,6 @@ summary = {
 }
 
 
-# Save model output to excel file
-
-# iter_df = pd.DataFrame({
-#     "iteration": iteration_numbers,
-#     "objective_value": obj_values,
-#     "recaptured_artificial": recaptured_values
-# })
-
-# iter_df.to_excel("column_generation_progress.xlsx", index=False)
 
 t_df = (
     pd.DataFrame(
@@ -415,105 +407,8 @@ t_df = (
     )
 )
 
-t_df.to_excel("t_values_final.xlsx", index=False)
-print("Saved t_values to t_values_final.xlsx")
+t_df.to_excel("t_values_validation_test.xlsx", index=False)
+print("Saved t_values to t_values_validation_test.xlsx")
 
 
 
-def heatmap_t_values(t_values, P):
-    # Create a 2D array for heatmap
-    heatmap_data = np.zeros((len(P), len(P)))
-
-    p_index = {p: idx for idx, p in enumerate(P)}
-    r_index = {r: idx for idx, r in enumerate(P)}
-
-    for (p, r), val in t_values.items():
-        heatmap_data[p_index[p], r_index[r]] = val
-
-
-
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(heatmap_data, xticklabels=P, yticklabels=P, cmap="RdYlGn_r")
-    plt.xlabel("Itinerary r")
-    plt.ylabel("Itinerary p")
-    plt.title("Heatmap of t[p,r] values")
-    plt.show()
-
-flight_info = {flight_number : {"demand": 0, "capacity" : 0} for flight_number in FL.index}
-
-for itinerary in DEL.index:
-    for flight in DEL.columns:
-        if DEL.loc[itinerary, flight] == 1:
-            flight_info[flight]["demand"] += IT.loc[itinerary, "Demand"].item()
-            flight_info[flight]["capacity"] = FL.loc[flight, "Capacity"].item()
-
-
-def plot_spilled_passengers_heatmap(FL, flight_info):
-    """
-    Heatmap:
-      - y-axis: origin of a flight with flight number in parentheses
-      - x-axis: destination airport
-      - color: number of spilled passengers on that flight
-               (demand - capacity, floored at 0)
-    """
-    # Adjust these if your column names are different
-    origin_col = "Origin"
-    destination_col = "Destination"
-
-    # Unique destinations for x-axis
-    destinations = FL[destination_col].unique().tolist()
-
-    # Flights for y-axis
-    flights = FL.index.tolist()
-
-    # Matrix: rows = flights, cols = destinations
-    heatmap_data = np.zeros((len(flights), len(destinations)))
-
-    for row_idx, flight in enumerate(flights):
-        origin = FL.loc[flight, origin_col]
-        dest = FL.loc[flight, destination_col]
-
-        # spilled passengers = max(demand - capacity, 0)
-        demand = flight_info[flight]["demand"]
-        capacity = flight_info[flight]["capacity"]
-        spilled = demand - capacity
-
-        # place in matrix at (flight row, destination column)
-        col_idx = destinations.index(dest)
-        heatmap_data[row_idx, col_idx] = spilled
-
-    # Build y-tick labels: "Origin (FlightNo)"
-    yticklabels = [f"{FL.loc[f, origin_col]} ({f})" for f in flights]
-    yticklabels = [f"{f}" for f in flights]
-
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(
-        heatmap_data.transpose(),  # transpose for correct orientation
-        annot=False,
-        xticklabels=yticklabels,
-        yticklabels=destinations,
-        cmap = "Reds"
-    )
-    plt.xticks(fontsize=8)
-
-    plt.ylabel("Origin (Flight number)")
-    plt.title("Spilled passengers per flight (demand - capacity)")
-    plt.tight_layout()
-    ax = plt.gca()
-    ax.xaxis.tick_top()
-    ax.xaxis.set_label_position('top')
-    sns.set(font_scale=0.1)
-    plt.yticks(rotation=0)      # horizontal labels
-    plt.xticks(rotation=45)     # angled columns
-    plt.xlabel("Destination")
-    plt.show()
-
-
-# #  Plot 1: Objective value 
-# plt.figure(figsize = (12,6))
-# plt.plot(iteration_numbers, obj_values, marker='o')
-# plt.title("Objective Function Value per Iteration")
-# plt.xlabel("Iteration")
-# plt.ylabel("Objective Value (Cost)")
-# plt.grid(True)
-# plt.show()
