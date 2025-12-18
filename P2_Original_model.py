@@ -122,7 +122,7 @@ def create_Q(DEL, IT):
 
 def make_PR_total_list(P):
     PR = [(p, r) for p in P for r in P if B.loc[(p, r), "b_pr"] != 0]
-    PR += [(p, "artificial") for p in P]
+    # PR += [(p, "artificial") for p in P]
     # PR += [("artificial", r) for r in P]
     PR_total = list(dict.fromkeys(PR))
     return PR_total
