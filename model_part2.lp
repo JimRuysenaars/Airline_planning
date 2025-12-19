@@ -1,6 +1,6 @@
 \ Model Passenger_Mix_Flow
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0x1666e1e90547203f
+\ Signature: 0x3e5da42aa6091a71
 Minimize
   42 t_pr[0,artificial] + 65 t_pr[1,artificial] + 68 t_pr[2,artificial]
    + 43 t_pr[3,artificial] + 56 t_pr[4,artificial] + 42 t_pr[5,artificial]
@@ -63,16 +63,17 @@ Minimize
    + 226 t_pr[119,artificial] + 285 t_pr[120,artificial]
    + 271 t_pr[121,artificial] + 235 t_pr[122,artificial]
    + 251 t_pr[123,artificial] + 228 t_pr[124,artificial]
-   + 20.06 t_pr[15,16] + 3.65 t_pr[0,6] + 14.05 t_pr[22,23]
-   + 33.95 t_pr[34,31] + 22.64 t_pr[17,18] + 33.75 t_pr[24,23]
-   + 16.44 t_pr[8,4] + 40.05 t_pr[2,1] + 38.8 t_pr[14,12] + 18.9 t_pr[7,5]
-   + 190.56 t_pr[94,25] + 42.22 t_pr[24,25] + 23.56 t_pr[43,44]
-   + 45.65 t_pr[31,35] + 22.32 t_pr[35,33] + 21.84 t_pr[7,0]
-   + 53.36 t_pr[34,33] + 23.4 t_pr[33,32] + 30.8 t_pr[70,71]
-   + 29.84 t_pr[26,25] + 23.58 t_pr[8,5] + 43.56 t_pr[10,13]
-   + 205.85 t_pr[90,12] + 39.24 t_pr[27,21] + 31.95 t_pr[3,6]
-   + 30.95 t_pr[20,19] + 42.8 t_pr[28,29] + 28.08 t_pr[9,14]
-   + 30.08 t_pr[11,14] + 56.15 t_pr[34,35] + 90.25 t_pr[106,99]
+   - 126 t_pr[artificial,16] + 20.06 t_pr[15,16] + 3.65 t_pr[0,6]
+   + 14.05 t_pr[22,23] + 33.95 t_pr[34,31] + 22.64 t_pr[17,18]
+   + 33.75 t_pr[24,23] + 16.44 t_pr[8,4] + 40.05 t_pr[2,1]
+   + 38.8 t_pr[14,12] + 18.9 t_pr[7,5] + 190.56 t_pr[94,25]
+   + 42.22 t_pr[24,25] + 23.56 t_pr[43,44] + 45.65 t_pr[31,35]
+   + 22.32 t_pr[35,33] + 21.84 t_pr[7,0] + 53.36 t_pr[34,33]
+   + 23.4 t_pr[33,32] + 30.8 t_pr[70,71] + 29.84 t_pr[26,25]
+   + 23.58 t_pr[8,5] + 43.56 t_pr[10,13] + 205.85 t_pr[90,12]
+   + 39.24 t_pr[27,21] + 31.95 t_pr[3,6] + 30.95 t_pr[20,19]
+   + 42.8 t_pr[28,29] + 28.08 t_pr[9,14] + 30.08 t_pr[11,14]
+   + 56.15 t_pr[34,35] + 90.25 t_pr[106,99]
 Subject To
  C1_Capacity_SS1002: t_pr[0,artificial] + t_pr[0,6] - 0.48 t_pr[7,0] >= 83
  C1_Capacity_SS1031: t_pr[1,artificial] - 0.43 t_pr[2,1] >= -97
@@ -329,7 +330,7 @@ Subject To
  C2_Demand_122: t_pr[122,artificial] <= 3
  C2_Demand_123: t_pr[123,artificial] <= 12
  C2_Demand_124: t_pr[124,artificial] <= 31
- C2_Demand_artificial: <= 0
+ C2_Demand_artificial: t_pr[artificial,16] <= 0
  C3_NonNegativity_0_artificial: t_pr[0,artificial] >= 0
  C3_NonNegativity_1_artificial: t_pr[1,artificial] >= 0
  C3_NonNegativity_2_artificial: t_pr[2,artificial] >= 0
@@ -455,6 +456,7 @@ Subject To
  C3_NonNegativity_122_artificial: t_pr[122,artificial] >= 0
  C3_NonNegativity_123_artificial: t_pr[123,artificial] >= 0
  C3_NonNegativity_124_artificial: t_pr[124,artificial] >= 0
+ C3_NonNegativity_artificial_16: t_pr[artificial,16] >= 0
  C3_NonNegativity_15_16: t_pr[15,16] >= 0
  C3_NonNegativity_0_6: t_pr[0,6] >= 0
  C3_NonNegativity_22_23: t_pr[22,23] >= 0
@@ -529,10 +531,10 @@ Generals
  t_pr[114,artificial] t_pr[115,artificial] t_pr[116,artificial]
  t_pr[117,artificial] t_pr[118,artificial] t_pr[119,artificial]
  t_pr[120,artificial] t_pr[121,artificial] t_pr[122,artificial]
- t_pr[123,artificial] t_pr[124,artificial] t_pr[15,16] t_pr[0,6]
- t_pr[22,23] t_pr[34,31] t_pr[17,18] t_pr[24,23] t_pr[8,4] t_pr[2,1]
- t_pr[14,12] t_pr[7,5] t_pr[94,25] t_pr[24,25] t_pr[43,44] t_pr[31,35]
- t_pr[35,33] t_pr[7,0] t_pr[34,33] t_pr[33,32] t_pr[70,71] t_pr[26,25]
- t_pr[8,5] t_pr[10,13] t_pr[90,12] t_pr[27,21] t_pr[3,6] t_pr[20,19]
- t_pr[28,29] t_pr[9,14] t_pr[11,14] t_pr[34,35] t_pr[106,99]
+ t_pr[123,artificial] t_pr[124,artificial] t_pr[artificial,16] t_pr[15,16]
+ t_pr[0,6] t_pr[22,23] t_pr[34,31] t_pr[17,18] t_pr[24,23] t_pr[8,4]
+ t_pr[2,1] t_pr[14,12] t_pr[7,5] t_pr[94,25] t_pr[24,25] t_pr[43,44]
+ t_pr[31,35] t_pr[35,33] t_pr[7,0] t_pr[34,33] t_pr[33,32] t_pr[70,71]
+ t_pr[26,25] t_pr[8,5] t_pr[10,13] t_pr[90,12] t_pr[27,21] t_pr[3,6]
+ t_pr[20,19] t_pr[28,29] t_pr[9,14] t_pr[11,14] t_pr[34,35] t_pr[106,99]
 End

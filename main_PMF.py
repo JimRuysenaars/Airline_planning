@@ -84,8 +84,9 @@ def create_RECAPTURE(path, P):
         if p == r:
             B.loc[(p, r), 'b_pr'] = 0.0  # ensure b_pp = 0 -> can't transfer from itinerary 1 to 1
         # artificial → r recapture allowed with rate 1.0
-    # for r in P:
-    #     B.loc[("artificial", r), "b_pr"] = 1.0
+    for r in P:
+        B.loc[("artificial", r), "b_pr"] = 1.0
+        B.loc[(r, "artificial"), "b_pr"] = 1.0
 
 
     B['b_pr'] = B['b_pr'].fillna(0.0)   # only for b_pr, leave reduced_cost NaN
@@ -139,6 +140,7 @@ Qi = create_Q(DEL, IT)
 
 # Recapture pairs (p, r)
 B = create_RECAPTURE(path_recapture, P)
+print(B)
 
 
 # ---------- GUROBI MODEL ----------
@@ -319,7 +321,7 @@ while running:
             pr_min_red_cost = reduced_costs[0]['pair']
             pr_min_red_cost_reverse = (pr_min_red_cost[1], pr_min_red_cost[0])
 
-    print("Hier komt res: ", res["slack"])
+
    
     # Print info
     print(f"Selected column (p,r) = {pr_min_red_cost} with reduced cost = {B.loc[pr_min_red_cost, 'reduced_cost']:.2f}")
