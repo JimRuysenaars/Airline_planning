@@ -62,7 +62,7 @@ def OLS(combined_data, distances, path_demand):
     Uses the ordinary least squares method to calibrate the parameters of the gravity model using the population and GDP data from 2021.
     In order to executre the regression, a dataframe is first constructed containing all pairwise cominations of airports i, j and ommits 
     same Origin-Destination pairs to avoid biases in the regression.
-    The model is then linearized by taking the logarithm of both sides for each origin destination pair and assigns the variables y_ij and x_ij such that the paramters
+    The model is then linearized by taking the logarithm of both sides for each origin destination pair and assigns the variables y_ij and x_ij such that the parameters
     to be optimized are coefficients in a liear function. y = ln(k) + beta_1 * x1 + beta_2 * x2 + beta_3 * x3. Using the statsmodels package, the OLS regression is
     performed and the results are returned along with the predicted demand matrix according to the calibrated gravity model, for later comparison.
     """    
@@ -119,7 +119,9 @@ def OLS(combined_data, distances, path_demand):
 
     return k, beta_1, beta_2, beta_3, predicted_demand_dataframe
 
-
+k, beta_1, beta_2, beta_3, predicted_demand = OLS(path_combined_data, build_distance_matrix(path_airports, earth_radius), path_demand)
+print(k, beta_1, beta_2, beta_3)
+      
 def forecast_population_GDP(pop_GDP_data):
     """
     This function aims to answer subquestion 2. of 1A by forecasting the population and GDP values for 2026 based on the data from 2021 and 2024.
@@ -188,46 +190,25 @@ def compare_demand_matrices(observed_demand, predicted_demand):
     percent_diff = percent_diff.fillna(0)
 
     norm_signed = TwoSlopeNorm(vcenter=0)
-
-    fig, axes = plt.subplots(1, 2, figsize=(18, 8))
-
-    # First heatmap for the absolutepercentual difference
-    sns.heatmap(
-        percent_diff,
-        cmap='Reds',
-        ax=axes[0],
-        linewidths=1,        # grid line thickness
-        linecolor='white',    # grid line color
-        square=True,
-        cbar_kws={"label": "Percentual difference"}
-    )
-    axes[0].set_title("Percentual difference between predicted and observed demand")
-    axes[0].set_xlabel("Airport i")
-    axes[0].set_ylabel("Airport j")
-
-    # Second heatmap for the relative difference between predicted and observed demand
+    plt.figure(figsize=(10, 8))
     sns.heatmap(
         signed_diff,
         cmap='seismic',
         norm=norm_signed,
-        ax=axes[1],
         linewidths=1,
         linecolor='white',
         annot=True,
-        square=True,
-        cbar_kws={"label": "Relative difference"}
+        cbar_kws={"label": "Relative difference in demand"}
     )
-    axes[1].set_title("Relative difference between predicted and observed demand")
-    axes[1].set_xlabel("Airport i")
-    axes[1].set_ylabel("Airport j")
+    plt.title("Relative difference between predicted and observed demand")
+    plt.xlabel("Destination Airport")
+    plt.ylabel("Origin Airport")
 
     plt.tight_layout()
     plt.show()
 
 
     return None
-
-
 
 def __main__():
     """
