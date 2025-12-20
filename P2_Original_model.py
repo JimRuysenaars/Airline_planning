@@ -1,3 +1,17 @@
+'''
+Exercise 2 - Passenger Mix-Flow Problem - Original Model
+
+Authors: 
+Jim Rusenaars   (5309980)
+Thijmen God     (5265762)
+Lynn Vorgers    (5089301)
+
+Date: November - December 2025
+
+'''
+
+
+
 import pandas as pd
 import numpy as np
 import gurobipy as gp
